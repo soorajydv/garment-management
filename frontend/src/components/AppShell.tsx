@@ -6,6 +6,8 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { ROLE_LABELS, initials } from '@/lib/format';
 import type { Role } from '@/lib/types';
+import { api } from '@/lib/api';
+import { useTheme } from './ThemeProvider';
 
 type NavItem = { href: string; label: string; icon: string; roles: Role[] | 'all' };
 
@@ -59,9 +61,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, settings, logout } = useAuth();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<{ id: string; title: string; body: string; href: string }[]>([]);
+  const { theme, toggleTheme } = useTheme();
   const section = pathname.split('/')[1] || 'dashboard';
 
   useEffect(() => setOpen(false), [pathname]);
+
+  useEffect(() => {
+    let active = true;
+    api<{ notifications: { id: string; title: string; body: string; href: string }[] }>('/notifications')
+      .then((data) => { if (active) setNotifications(data.notifications); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [pathname]);
 
   const visible = NAV.map((g) => ({ ...g, items: g.items.filter((i) => i.roles === 'all' || i.roles.includes(user.role)) })).filter((g) => g.items.length);
   const title = user.role === 'customer' && section === 'orders' ? 'My orders' : TITLES[section] ?? 'S & S Textiles';
@@ -108,6 +121,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="top-actions">
+            <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? '☀' : '☾'}</button>
+            <div className="notification-wrap">
+              <button className="icon-btn" onClick={() => setNotificationsOpen((value) => !value)} aria-label="Open notifications" aria-expanded={notificationsOpen}>♢{notifications.length > 0 && <span className="notification-dot">{notifications.length > 9 ? '9+' : notifications.length}</span>}</button>
+              {notificationsOpen && <div className="notification-menu">
+                <h3>Notifications</h3>
+                {notifications.length ? notifications.map((notification) => <Link key={notification.id} href={notification.href} className="notification-item" onClick={() => setNotificationsOpen(false)}><strong>{notification.title}</strong><span>{notification.body}</span></Link>) : <div className="empty">You’re all caught up.</div>}
+              </div>}
+            </div>
             <div className="user-chip">
               <div className="who">
                 {user.name}

@@ -15,6 +15,7 @@ import inventoryRoutes from './routes/inventory';
 import dashboardRoutes from './routes/dashboard';
 import reportRoutes from './routes/reports';
 import { auditRouter, metaRouter, settingsRouter } from './routes/settings';
+import notificationRoutes from './routes/notifications';
 
 export function createApp() {
   const app = express();
@@ -35,6 +36,7 @@ export function createApp() {
   api.use(requireAuth);
   api.use('/meta', metaRouter);
   api.use('/dashboard', dashboardRoutes);
+  api.use('/notifications', notificationRoutes);
   api.use('/orders', orderRoutes);
   api.use('/customers', customerRoutes);
   api.use('/payments', paymentRoutes);

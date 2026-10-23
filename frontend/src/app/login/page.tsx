@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Field, Notice, errorMessage } from '@/components/ui';
+import { useTheme } from '@/components/ThemeProvider';
 
 const DEMO = [
   ['Owner', 'owner@sstextiles.com'],
@@ -22,6 +23,7 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -39,6 +41,9 @@ function LoginForm() {
 
   return (
     <form onSubmit={submit}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: -4 }}>
+        <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? '☀' : '☾'}</button>
+      </div>
       <div>
         <div className="eyebrow">S&amp;S TEXTILES</div>
         <h1>Sign in</h1>
