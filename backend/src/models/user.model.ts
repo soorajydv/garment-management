@@ -11,6 +11,8 @@ const userSchema = new Schema(
     phone: { type: String, trim: true, default: '' },
     active: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },
+    passwordResetTokenHash: { type: String, default: null, select: false },
+    passwordResetExpiresAt: { type: Date, default: null, select: false },
   },
   { timestamps: true },
 );

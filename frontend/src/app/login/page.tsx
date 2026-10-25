@@ -49,6 +49,7 @@ function LoginForm() {
         <h1>Sign in</h1>
         <div className="subtitle">Staff and customer accounts use the same sign-in.</div>
       </div>
+      {params.get('reset') === 'success' && <Notice>Password updated successfully. Sign in with your new password.</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
       <Field label="Email">
         <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -57,6 +58,7 @@ function LoginForm() {
         <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
       </Field>
       <button className="btn primary block" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      <div style={{ textAlign: 'right', marginTop: 10 }}><a className="link-btn" href="/forgot-password">Forgot password?</a></div>
       {process.env.NODE_ENV !== 'production' && (
         <div className="card" style={{ marginTop: 6 }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>Demo accounts · password Password@123</div>

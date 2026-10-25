@@ -2,8 +2,8 @@ import type { Request, Response } from 'express';
 import { env } from '../../config/env';
 import { AUTH_COOKIE, currentUser } from '../../middleware/auth';
 import { parse } from '../../lib/http';
-import { changePasswordSchema, deleteAccountSchema, loginSchema, profileSchema } from './auth.validation';
-import { changePassword, deleteAccount, getProfile, login, updateProfile } from './auth.service';
+import { changePasswordSchema, deleteAccountSchema, forgotPasswordSchema, loginSchema, profileSchema, resetPasswordSchema } from './auth.validation';
+import { changePassword, deleteAccount, getProfile, login, requestPasswordReset, resetPassword, updateProfile } from './auth.service';
 
 const cookieOptions = {
   httpOnly: true,
@@ -18,6 +18,21 @@ export async function loginController(req: Request, res: Response) {
   const result = await login(email, password);
   res.cookie(AUTH_COOKIE, result.token, cookieOptions);
   res.json(result);
+}
+
+export async function forgotPasswordController(req: Request, res: Response) {
+  const { email } = parse(forgotPasswordSchema, req.body);
+  const result = await requestPasswordReset(email);
+  const response: { message: string; resetUrl?: string } = { message: 'If an account exists for that email, password-reset instructions have been prepared.' };
+  if (result && !env.isProd) response.resetUrl = `${env.corsOrigins[0]}/reset-password?token=${result.token}`;
+  if (result) console.info(`Password reset link for ${email}: ${env.corsOrigins[0]}/reset-password?token=${result.token}`);
+  res.json(response);
+}
+
+export async function resetPasswordController(req: Request, res: Response) {
+  const { token, newPassword } = parse(resetPasswordSchema, req.body);
+  await resetPassword(token, newPassword);
+  res.json({ ok: true, message: 'Password reset successfully. You can now sign in.' });
 }
 
 export function logoutController(_req: Request, res: Response) {

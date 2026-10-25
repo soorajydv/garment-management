@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import { Customer } from '../../models/Customer';
 import { User } from '../../models/user.model';
 import { audit } from '../../lib/audit';
@@ -23,6 +24,30 @@ export async function login(email: string, password: string) {
   );
 
   return { token, user: await getProfile(String(user._id)) };
+}
+
+export async function requestPasswordReset(email: string) {
+  const user = await User.findOne({ email }).select('+passwordResetTokenHash +passwordResetExpiresAt');
+  if (!user || !user.active) return null;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  user.passwordResetTokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  user.passwordResetExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  await user.save();
+  await audit(null, 'auth.password_reset_requested', 'User', String(user._id), `Password reset requested for ${user.email}`);
+  return { token, expiresAt: user.passwordResetExpiresAt };
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({ passwordResetTokenHash: tokenHash, passwordResetExpiresAt: { $gt: new Date() }, active: true }).select('+passwordHash +passwordResetTokenHash +passwordResetExpiresAt');
+  if (!user) throw badRequest('This password reset link is invalid or has expired');
+
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  user.passwordResetTokenHash = null;
+  user.passwordResetExpiresAt = null;
+  await user.save();
+  await audit(null, 'auth.password_reset_completed', 'User', String(user._id), `${user.name} completed a password reset`);
 }
 
 export async function getProfile(userId: string) {

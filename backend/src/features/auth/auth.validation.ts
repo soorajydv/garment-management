@@ -5,6 +5,15 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Enter a valid email address'),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(40),
+  newPassword: z.string().min(8, 'Use at least 8 characters'),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1),
   newPassword: z.string().min(8, 'Use at least 8 characters'),
