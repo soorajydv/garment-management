@@ -110,6 +110,13 @@ router.get('/', requirePermission('orders.view'), async (req, res) => {
     filter.dueDate = { $lt: startOfToday() };
     filter.$and = [...((filter.$and as object[]) ?? []), { stage: { $ne: 'delivered' } }];
   }
+  if (q.due === 'soon') {
+    const today = startOfToday();
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 8);
+    filter.dueDate = { $gte: today, $lt: nextWeek };
+    filter.$and = [...((filter.$and as object[]) ?? []), { stage: { $ne: 'delivered' } }];
+  }
   if (q.search?.trim()) {
     const rx = { $regex: escapeRegex(q.search.trim()), $options: 'i' };
     const customers = await Customer.find({ name: rx }).select('_id').limit(200).lean();
@@ -117,7 +124,15 @@ router.get('/', requirePermission('orders.view'), async (req, res) => {
   }
 
   const [orders, total] = await Promise.all([
-    Order.find(filter).populate('customer', 'name phone').sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Order.aggregate([
+      { $match: filter },
+      ...(q.sort === 'recent' ? [] : q.sort === 'oldest' ? [] : [{ $addFields: { _deadlineState: { $cond: [{ $eq: ['$stage', 'delivered'] }, 1, 0] } } }]),
+      { $sort: q.sort === 'recent' ? { createdAt: -1 } : q.sort === 'oldest' ? { createdAt: 1 } : { _deadlineState: 1, dueDate: 1, createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      { $lookup: { from: 'customers', localField: 'customer', foreignField: '_id', as: 'customer' } },
+      { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+    ]),
     Order.countDocuments(filter),
   ]);
   res.json({ orders: orders.map((o) => serializeOrder(o, user)), total, page, limit });

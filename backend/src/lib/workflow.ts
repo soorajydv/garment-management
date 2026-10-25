@@ -80,10 +80,10 @@ export function fileUrl(orderId: string, storedName: string) {
 }
 
 /** Shapes an order for the API, hiding financial fields from production roles. */
-type SerializableOrder = Pick<OrderAttrs, 'artworks' | 'approval'> & { toObject(opts?: object): unknown };
+type SerializableOrder = Pick<OrderAttrs, 'artworks' | 'approval'> & { toObject?(opts?: object): unknown };
 
 export function serializeOrder(order: SerializableOrder, user: AuthUser) {
-  const o = order.toObject({ versionKey: false }) as Record<string, any>;
+  const o = (typeof order.toObject === 'function' ? order.toObject({ versionKey: false }) : order) as Record<string, any>;
   const id = String(o._id);
   const currentVersion = currentArtworkVersion(order);
   const customer = o.customer && typeof o.customer === 'object' && 'name' in o.customer

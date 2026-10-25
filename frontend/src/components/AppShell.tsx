@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
@@ -11,6 +11,7 @@ import { useTheme } from './ThemeProvider';
 import { Icon, type IconName } from './Icon';
 
 type NavItem = { href: string; label: string; icon: IconName; permission?: Permission };
+type NotificationItem = { id: string; type?: string; title: string; body: string; href: string };
 
 const NAV: { label: string; items: NavItem[] }[] = [
   {
@@ -67,7 +68,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<{ id: string; title: string; body: string; href: string }[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const notificationRef = useRef<HTMLDivElement>(null);
   const { theme, toggleTheme } = useTheme();
   const section = pathname.split('/')[1] || 'dashboard';
 
@@ -79,8 +81,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => setOpen(false), [pathname]);
 
   useEffect(() => {
+    if (!notificationsOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) setNotificationsOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNotificationsOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [notificationsOpen]);
+
+  useEffect(() => {
     let active = true;
-    api<{ notifications: { id: string; title: string; body: string; href: string }[] }>('/notifications')
+    api<{ notifications: NotificationItem[] }>('/notifications')
       .then((data) => { if (active) setNotifications(data.notifications); })
       .catch(() => undefined);
     return () => { active = false; };
@@ -88,6 +106,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const visible = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.permission || meta.permissions.includes(i.permission)) })).filter((g) => g.items.length);
   const title = user.role === 'customer' && section === 'orders' ? 'My orders' : TITLES[section] ?? 'S & S Textiles';
+  const notificationIcon = (type?: string): IconName => type === 'stock' ? 'inventory' : type === 'attendance' ? 'attendance' : type === 'approval' ? 'orders' : type === 'overdue' ? 'alert' : 'bell';
 
   return (
     <div className={`layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
@@ -132,11 +151,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <div className="top-actions">
             <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
-            <div className="notification-wrap">
+            <div className="notification-wrap" ref={notificationRef}>
               <button className="icon-btn" onClick={() => setNotificationsOpen((value) => !value)} aria-label="Open notifications" aria-expanded={notificationsOpen}><Icon name="bell" size={17} />{notifications.length > 0 && <span className="notification-dot">{notifications.length > 9 ? '9+' : notifications.length}</span>}</button>
               {notificationsOpen && <div className="notification-menu">
-                <h3>Notifications</h3>
-                {notifications.length ? notifications.map((notification) => <Link key={notification.id} href={notification.href} className="notification-item" onClick={() => setNotificationsOpen(false)}><strong>{notification.title}</strong><span>{notification.body}</span></Link>) : <div className="empty">You’re all caught up.</div>}
+                <div className="notification-head"><div><h3>Notifications</h3><span>{notifications.length ? `${notifications.length} alert${notifications.length === 1 ? '' : 's'} to review` : 'You’re all caught up'}</span></div><button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications"><Icon name="close" size={15} /></button></div>
+                {notifications.length ? <div className="notification-list">{notifications.map((notification) => <Link key={notification.id} href={notification.href} className="notification-item" onClick={() => setNotificationsOpen(false)}><span className="notification-icon"><Icon name={notificationIcon(notification.type)} size={15} /></span><span className="notification-copy"><strong>{notification.title}</strong><span>{notification.body}</span></span></Link>)}</div> : <div className="empty">No new notifications.</div>}
               </div>}
             </div>
             <div className="user-chip">
@@ -144,7 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {user.name}
                 <small>{roleLabel(user.role, meta.roles)}</small>
               </div>
-              <div className="avatar">{initials(user.name)}</div>
+              <Link className="avatar" href="/profile" aria-label="Open my profile" title="My profile">{initials(user.name)}</Link>
             </div>
           </div>
         </header>

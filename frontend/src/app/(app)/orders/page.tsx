@@ -18,20 +18,22 @@ export default function OrdersPage() {
   const [debounced, setDebounced] = useState('');
   const [stage, setStage] = useState('');
   const [status, setStatus] = useState('');
-  const [overdue, setOverdue] = useState(false);
+  const [due, setDue] = useState('');
+  const [sort, setSort] = useState('deadline');
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
-  useEffect(() => setPage(1), [debounced, stage, status, overdue]);
+  useEffect(() => setPage(1), [debounced, stage, status, due, sort]);
 
   const qs = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
   if (debounced) qs.set('search', debounced);
   if (stage) qs.set('stage', stage);
   if (status) qs.set('status', status);
-  if (overdue) qs.set('due', 'overdue');
+  if (due) qs.set('due', due);
+  qs.set('sort', sort);
   const { data, error, loading } = useApi<{ orders: Order[]; total: number }>(`/orders?${qs}`);
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
 
@@ -55,9 +57,16 @@ export default function OrdersPage() {
           <option value="">All statuses</option>
           {STATUSES.map((s) => <option key={s}>{s}</option>)}
         </select>
-        <label className="btn" style={{ fontWeight: 600 }}>
-          <input type="checkbox" checked={overdue} onChange={(e) => setOverdue(e.target.checked)} /> Overdue only
-        </label>
+        <select value={due} onChange={(e) => setDue(e.target.value)} aria-label="Deadline filter">
+          <option value="">All deadlines</option>
+          <option value="soon">Due in next 7 days</option>
+          <option value="overdue">Overdue only</option>
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort orders">
+          <option value="deadline">Nearest deadline</option>
+          <option value="recent">Recently added</option>
+          <option value="oldest">Oldest added</option>
+        </select>
       </div>
       {error && <Notice tone="error">{error}</Notice>}
   <div className="card flush">{!data && loading ? <Spinner /> : <OrderTable orders={data?.orders ?? []} showMoney={canSeeMoney(user.role, meta.permissions)} />}</div>
