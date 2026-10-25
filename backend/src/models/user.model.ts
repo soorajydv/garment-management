@@ -1,12 +1,11 @@
 import { Schema, model, InferSchemaType, HydratedDocument } from 'mongoose';
-import { ROLES } from '../lib/constants';
 
 const userSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true, select: false },
-    role: { type: String, enum: ROLES, required: true },
+    role: { type: String, required: true, lowercase: true, trim: true },
     /** Set only for customer accounts: the customer record they may access. */
     customer: { type: Schema.Types.ObjectId, ref: 'Customer', default: null },
     phone: { type: String, trim: true, default: '' },

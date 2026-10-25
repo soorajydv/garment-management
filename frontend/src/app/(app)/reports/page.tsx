@@ -32,6 +32,8 @@ export default function ReportsPage() {
   const maxStage = Math.max(1, ...data.byStage.map((s) => s.orders));
   const maxRecv = Math.max(1, ...data.receivables.map((r) => r.outstanding));
   const maxSets = Math.max(1, ...data.products.map((p) => p.sets));
+  const yTicks = [1, 0.75, 0.5, 0.25, 0];
+  const collectionRate = totalValue ? Math.min(1, totalCollected / totalValue) : 0;
 
   return (
     <>
@@ -71,6 +73,12 @@ export default function ReportsPage() {
           </div>
           <button className="link-btn" onClick={() => setShowTable(!showTable)}>{showTable ? 'Show chart' : 'Show table'}</button>
         </div>
+        <div className="chart-summary">
+          <div><span>Period order value</span><strong>{fmtMoney(totalValue)}</strong></div>
+          <div><span>Collected</span><strong className="green">{fmtMoney(totalCollected)}</strong></div>
+          <div><span>Collection rate</span><strong className={collectionRate >= 0.8 ? 'green' : 'amber'}>{Math.round(collectionRate * 100)}%</strong></div>
+          <div><span>Uncollected</span><strong className={totalValue - totalCollected > 0 ? 'amber' : 'green'}>{fmtMoney(Math.max(0, totalValue - totalCollected))}</strong></div>
+        </div>
         <div className="legend">
           <span><i className="swatch" style={{ background: 'var(--series-1)' }} />Order value</span>
           <span><i className="swatch" style={{ background: 'var(--series-2)' }} />Collected</span>
@@ -88,24 +96,29 @@ export default function ReportsPage() {
           </div>
         ) : (
           <>
-            <div className="col-chart" role="img" aria-label="Monthly order value and collections">
-              {data.monthly.map((m, i) => (
-                <div key={m.month} className="col-group" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(i)} onBlur={() => setHover(null)} tabIndex={0}>
-                  <div className="col-bar" style={{ height: `${(m.orderValue / max) * 100}%`, background: 'var(--series-1)' }} />
-                  <div className="col-bar" style={{ height: `${(m.collected / max) * 100}%`, background: 'var(--series-2)' }} />
-                  {hover === i && (
-                    <div className="chart-tip">
-                      <strong>{monthLabel(m.month)}</strong>
-                      <br />
-                      Order value: {fmtMoney(m.orderValue)}
-                      <br />
-                      Collected: {fmtMoney(m.collected)}
-                      <br />
-                      {m.orders} orders · {m.sets} sets
+            <div className="chart-visual">
+              <div className="chart-y-axis" aria-hidden>{yTicks.map((tick) => <span key={tick}>{compact(max * tick)}</span>)}</div>
+              <div className="chart-plot" role="img" aria-label="Monthly order value and collections">
+                <div className="chart-gridlines" aria-hidden>{yTicks.map((tick) => <i key={tick} style={{ bottom: `${tick * 100}%` }} />)}</div>
+                <div className="col-chart">
+                  {data.monthly.map((m, i) => (
+                    <div key={m.month} className={`col-group ${hover === i ? 'selected' : ''}`} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onFocus={() => setHover(i)} onBlur={() => setHover(null)} tabIndex={0} aria-label={`${monthLabel(m.month)}: order value ${fmtMoney(m.orderValue)}, collected ${fmtMoney(m.collected)}, ${m.orders} orders and ${m.sets} sets`}>
+                      <div className="col-bars">
+                        <div className="col-bar" style={{ height: `${(m.orderValue / max) * 100}%`, background: 'var(--series-1)' }} />
+                        <div className="col-bar" style={{ height: `${(m.collected / max) * 100}%`, background: 'var(--series-2)' }} />
+                      </div>
+                      {hover === i && (
+                        <div className="chart-tip">
+                          <strong>{monthLabel(m.month)}</strong>
+                          <span><i className="swatch" style={{ background: 'var(--series-1)' }} />Order value <b>{fmtMoney(m.orderValue)}</b></span>
+                          <span><i className="swatch" style={{ background: 'var(--series-2)' }} />Collected <b>{fmtMoney(m.collected)}</b></span>
+                          <small>{m.orders} orders · {m.sets} sets</small>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
             <div className="col-labels">
               {data.monthly.map((m) => <div key={m.month}>{monthLabel(m.month)}<br /><span className="muted">{compact(m.orderValue)}</span></div>)}

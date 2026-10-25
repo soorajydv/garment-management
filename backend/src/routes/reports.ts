@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { Order } from '../models/Order';
 import { Payment } from '../models/Payment';
-import { requireRole } from '../middleware/auth';
+import { requirePermission } from '../middleware/auth';
 import { STAGE_LABELS, STAGES, type Stage } from '../lib/constants';
 
 const router = Router();
-router.use(requireRole('owner', 'accounts'));
+router.use(requirePermission('reports.view'));
 
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 

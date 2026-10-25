@@ -64,7 +64,7 @@ export default function ProductionPage() {
                 </div>
                 {jobs.map((o) => {
                   const gated = stage === 'design' && !o.approved;
-                  const canMove = stage !== 'ready' && canCompleteStage(user.role, stage);
+                  const canMove = stage !== 'ready' && canCompleteStage(user.role, stage, meta.permissions);
                   return (
                     <div className="job-card" key={o.id}>
                       <div className="job-top">
@@ -99,7 +99,7 @@ export default function ProductionPage() {
                           {o.currentVersion ? 'Awaiting customer approval' : 'Upload artwork →'}
                         </Link>
                       )}
-                      {stage === 'ready' && user.role === 'owner' && (
+                      {stage === 'ready' && meta.permissions.includes('orders.deliver') && (
                         <Link className="btn small primary block" style={{ marginTop: 10 }} href="/delivery">Dispatch →</Link>
                       )}
                     </div>

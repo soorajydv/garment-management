@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { User } from '../models/User';
+import { User } from '../models/user.model';
 import { Customer } from '../models/Customer';
-import { currentUser, requireRole } from '../middleware/auth';
-import { ROLES } from '../lib/constants';
+import { currentUser, requirePermission } from '../middleware/auth';
+import { roleExists } from '../lib/roles';
 import { assertObjectId, badRequest, notFound, parse } from '../lib/http';
 import { audit } from '../lib/audit';
 
 const router = Router();
-router.use(requireRole('owner'));
+router.use(requirePermission('users.manage'));
 
 const toDto = (u: Record<string, any>) => ({
   id: String(u._id),
@@ -42,7 +42,7 @@ const createSchema = z.object({
   name: z.string().trim().min(2),
   email: z.email().trim().toLowerCase(),
   password: z.string().min(8, 'Use at least 8 characters'),
-  role: z.enum(ROLES),
+  role: z.string().trim().toLowerCase().min(2).max(40),
   phone: z.string().trim().max(30).optional().default(''),
   customer: z.string().nullish(),
 });
@@ -50,6 +50,7 @@ const createSchema = z.object({
 router.post('/', async (req, res) => {
   const me = currentUser(req);
   const body = parse(createSchema, req.body);
+  if (!(await roleExists(body.role))) throw badRequest('role: Role not found');
   const customer = await checkCustomerLink(body.role, body.customer);
   const user = await User.create({
     name: body.name,
@@ -66,7 +67,7 @@ router.post('/', async (req, res) => {
 
 const updateSchema = z.object({
   name: z.string().trim().min(2).optional(),
-  role: z.enum(ROLES).optional(),
+  role: z.string().trim().toLowerCase().min(2).max(40).optional(),
   phone: z.string().trim().max(30).optional(),
   active: z.boolean().optional(),
   customer: z.string().nullish(),
@@ -76,10 +77,11 @@ router.patch('/:id', async (req, res) => {
   const me = currentUser(req);
   const id = assertObjectId(req.params.id, 'User');
   const body = parse(updateSchema, req.body);
+  if (body.role && !(await roleExists(body.role))) throw badRequest('role: Role not found');
   const user = await User.findById(id);
   if (!user) throw notFound('User not found');
-  if (id === me.id && (body.active === false || (body.role && body.role !== 'owner'))) {
-    throw badRequest('You cannot deactivate or demote your own owner account');
+  if (id === me.id && (body.active === false || (body.role && body.role !== user.role))) {
+    throw badRequest('You cannot deactivate or change your own role');
   }
   const role = body.role ?? user.role;
   const customerInput = body.customer === undefined ? (user.customer ? String(user.customer) : null) : body.customer;
@@ -104,6 +106,16 @@ router.post('/:id/reset-password', async (req, res) => {
   user.passwordHash = await bcrypt.hash(password, 10);
   await user.save();
   await audit(me, 'user.password_reset', 'User', id, `Reset password for ${user.name}`);
+  res.json({ ok: true });
+});
+
+router.delete('/:id', async (req, res) => {
+  const me = currentUser(req);
+  const id = assertObjectId(req.params.id, 'User');
+  if (id === me.id) throw badRequest('You cannot delete your own account');
+  const user = await User.findByIdAndDelete(id).lean();
+  if (!user) throw notFound('User not found');
+  await audit(me, 'user.deleted', 'User', id, `Deleted ${user.name}'s account`);
   res.json({ ok: true });
 });
 

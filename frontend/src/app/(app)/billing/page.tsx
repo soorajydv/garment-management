@@ -12,12 +12,12 @@ import { fmtDate, fmtMoney } from '@/lib/format';
 import type { Order, Payment } from '@/lib/types';
 
 function Billing() {
-  const { user } = useAuth();
+  const { user, meta } = useAuth();
   const toast = useToast();
   const params = useSearchParams();
   const customerFilter = params.get('customer');
   const isCustomer = user.role === 'customer';
-  const canRecord = user.role === 'owner' || user.role === 'accounts';
+  const canRecord = meta.permissions.includes('payments.record');
   const orders = useApi<{ orders: Order[] }>(`/orders?limit=200${customerFilter ? `&customer=${customerFilter}` : ''}`);
   const payments = useApi<{ payments: Payment[] }>(`/payments?limit=100${customerFilter ? `&customer=${customerFilter}` : ''}`);
   const [tab, setTab] = useState<'invoices' | 'payments'>('invoices');
@@ -115,7 +115,7 @@ function Billing() {
           {!payments.data ? <Spinner /> : !payments.data.payments.length ? <Empty>No payments recorded.</Empty> : (
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Date</th><th>Order</th><th>Customer</th><th>Method</th><th>Reference</th><th className="num">Amount</th><th>Recorded by</th>{user.role === 'owner' && <th />}</tr></thead>
+                <thead><tr><th>Date</th><th>Order</th><th>Customer</th><th>Method</th><th>Reference</th><th className="num">Amount</th><th>Recorded by</th>{meta.permissions.includes('payments.delete') && <th />}</tr></thead>
                 <tbody>
                   {payments.data.payments.map((p) => (
                     <tr key={p.id}>
@@ -126,7 +126,7 @@ function Billing() {
                       <td>{p.reference || '—'}</td>
                       <td className="num"><strong>{fmtMoney(p.amount)}</strong></td>
                       <td>{p.recordedBy || '—'}</td>
-                      {user.role === 'owner' && <td><button className="btn small danger" onClick={() => deletePayment(p)}>Delete</button></td>}
+                      {meta.permissions.includes('payments.delete') && <td><button className="btn small danger" onClick={() => deletePayment(p)}>Delete</button></td>}
                     </tr>
                   ))}
                 </tbody>

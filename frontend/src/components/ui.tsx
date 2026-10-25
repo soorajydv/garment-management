@@ -4,6 +4,12 @@ import { useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { Order } from '@/lib/types';
 import { dueLabel, fmtMoney } from '@/lib/format';
+import { Icon, type IconName } from './Icon';
+
+const STAT_ICONS: Record<string, IconName> = {
+  '◈': 'dashboard', '▤': 'orders', '▧': 'inventory', '↗': 'arrowUp', '◷': 'attendance',
+  '▥': 'chart', '!': 'alert', '✓': 'check', '□': 'box', '↔': 'activity',
+};
 
 export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow: string; title: string; subtitle?: string; actions?: ReactNode }) {
   return (
@@ -23,7 +29,7 @@ export function StatCard({ label, value, note, icon = '◈', tone = '' }: { labe
     <div className="card">
       <div className="stat-top">
         <span>{label}</span>
-        <span className="stat-icon" aria-hidden>{icon}</span>
+        <span className="stat-icon">{STAT_ICONS[icon] ? <Icon name={STAT_ICONS[icon]} size={16} /> : icon}</span>
       </div>
       <div className={`stat-num ${tone}`}>{value}</div>
       {note && <div className="stat-note">{note}</div>}

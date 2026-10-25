@@ -17,9 +17,9 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { user } = useAuth();
+  const { user, meta } = useAuth();
   const { data, error, setData } = useApi<{ order: Order }>(`/orders/${id}`);
-  const money = canSeeMoney(user.role);
+  const money = canSeeMoney(user.role, meta.permissions);
   const payments = useApi<{ payments: Payment[] }>(money ? `/payments?order=${id}` : null);
   const [modal, setModal] = useState<ModalKind>(null);
   const [busy, setBusy] = useState(false);
@@ -43,11 +43,11 @@ export default function OrderDetailPage() {
   const stageIdx = STAGE_ORDER.indexOf(order.stage);
   const nextStage = STAGE_ORDER[stageIdx + 1];
   const isDesign = order.stage === 'design';
-  const canAdvance = order.stage !== 'ready' && order.stage !== 'delivered' && canCompleteStage(role, order.stage);
+  const canAdvance = order.stage !== 'ready' && order.stage !== 'delivered' && canCompleteStage(role, order.stage, meta.permissions);
   const advanceBlocked = isDesign && !order.approved;
-  const canUpload = isDesign && (role === 'owner' || role === 'design');
-  const canApprove = isDesign && order.currentVersion > 0 && !order.approved && (role === 'customer' || role === 'owner');
-  const canFeedback = isDesign && order.currentVersion > 0 && ['owner', 'design', 'customer'].includes(role);
+  const canUpload = isDesign && meta.permissions.includes('orders.artwork.upload');
+  const canApprove = isDesign && order.currentVersion > 0 && !order.approved && meta.permissions.includes('orders.approve');
+  const canFeedback = isDesign && order.currentVersion > 0 && meta.permissions.includes('orders.feedback');
   const latestFeedback = order.feedback.filter((f) => f.version === order.currentVersion);
 
   async function issueInvoice() {
@@ -83,15 +83,15 @@ export default function OrderDetailPage() {
         subtitle={`${order.quantity} sets · ${order.productConfig}`}
         actions={
           <>
-            {(role === 'owner' || role === 'accounts') && order.stage !== 'delivered' && <button className="btn" onClick={() => setModal('edit')}>Edit</button>}
-            {role === 'owner' && !['design', 'delivered'].includes(order.stage) && <button className="btn" onClick={() => setModal('sendBack')}>↩ Send back</button>}
-            {role === 'owner' && isDesign && <button className="btn danger" onClick={deleteOrder}>Delete</button>}
+            {meta.permissions.includes('orders.update') && order.stage !== 'delivered' && <button className="btn" onClick={() => setModal('edit')}>Edit</button>}
+            {meta.permissions.includes('orders.send_back') && !['design', 'delivered'].includes(order.stage) && <button className="btn" onClick={() => setModal('sendBack')}>↩ Send back</button>}
+            {meta.permissions.includes('orders.delete') && isDesign && <button className="btn danger" onClick={deleteOrder}>Delete</button>}
             {canAdvance && (
               <button className="btn primary" disabled={advanceBlocked} title={advanceBlocked ? 'Waiting for customer artwork approval' : undefined} onClick={() => setModal('advance')}>
                 Complete {STAGE_SHORT[order.stage]} → {nextStage && STAGE_SHORT[nextStage]}
               </button>
             )}
-            {order.stage === 'ready' && role === 'owner' && <button className="btn primary" onClick={() => setModal('deliver')}>Confirm dispatch</button>}
+            {order.stage === 'ready' && meta.permissions.includes('orders.deliver') && <button className="btn primary" onClick={() => setModal('deliver')}>Confirm dispatch</button>}
           </>
         }
       />
@@ -260,8 +260,8 @@ export default function OrderDetailPage() {
               <div className="kv"><span>Paid</span><strong className="green">{fmtMoney(order.amountPaid)}</strong></div>
               <div className="kv"><span>Balance</span><strong className={order.balance ? 'amber' : 'green'}>{fmtMoney(order.balance)}</strong></div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-                {(role === 'owner' || role === 'accounts') && (order.balance ?? 0) > 0 && <button className="btn small primary" onClick={() => setModal('payment')}>＋ Record payment</button>}
-                {(role === 'owner' || role === 'accounts') && !order.invoice?.number && !!order.totalAmount && <button className="btn small" disabled={busy} onClick={issueInvoice}>Issue invoice</button>}
+                {meta.permissions.includes('payments.record') && (order.balance ?? 0) > 0 && <button className="btn small primary" onClick={() => setModal('payment')}>＋ Record payment</button>}
+                {meta.permissions.includes('orders.invoice') && !order.invoice?.number && !!order.totalAmount && <button className="btn small" disabled={busy} onClick={issueInvoice}>Issue invoice</button>}
                 {(order.invoice?.number || !!order.totalAmount) && <Link className="btn small" href={`/invoice/${order.id}`} target="_blank">{order.invoice?.number ? 'View invoice' : 'View quotation'}</Link>}
               </div>
               {payments.data && payments.data.payments.length > 0 && (

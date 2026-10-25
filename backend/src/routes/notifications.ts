@@ -4,6 +4,7 @@ import { Order } from '../models/Order';
 import { currentUser } from '../middleware/auth';
 import { getSettings } from '../models/Settings';
 import { orderScope } from '../lib/workflow';
+import { Attendance } from '../features/attendance/attendance.model';
 
 const router = Router();
 
@@ -59,6 +60,25 @@ router.get('/', async (req, res) => {
     const lowStock = await InventoryItem.find({ active: true, $expr: { $lt: ['$onHand', '$reorderLevel'] } }).sort({ onHand: 1 }).limit(6).lean();
     for (const item of lowStock) {
       notifications.push({ id: `stock-${String(item._id)}`, type: 'stock', tone: 'red', title: 'Material below reorder level', body: `${item.name} · ${item.onHand} ${item.unit} remaining`, href: '/inventory' });
+    }
+  }
+
+  if (user.permissions.includes('attendance.approve')) {
+    const pendingCheckIns = await Attendance.find({ status: 'pending' })
+      .populate('user', 'name')
+      .sort({ checkInAt: 1 })
+      .limit(8)
+      .lean();
+    for (const record of pendingCheckIns) {
+      const employee = record.user as { name?: string };
+      notifications.push({
+        id: `attendance-${String(record._id)}`,
+        type: 'attendance',
+        tone: 'amber',
+        title: 'Check-in approval needed',
+        body: `${employee?.name ?? 'Employee'} requested check-in approval`,
+        href: '/attendance',
+      });
     }
   }
 

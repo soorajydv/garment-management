@@ -10,7 +10,8 @@ import { fmtDate, fmtMoney } from '@/lib/format';
 import type { Customer, Order } from '@/lib/types';
 
 export default function CustomersPage() {
-  const { user } = useAuth();
+  const { meta } = useAuth();
+  const canManage = meta.permissions.includes('customers.manage');
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -42,7 +43,7 @@ export default function CustomersPage() {
         eyebrow="CUSTOMER DIRECTORY"
         title="Customers"
         subtitle="Clubs, schools and teams with their order history and balances."
-        actions={<button className="btn primary" onClick={() => setEditing('new')}>＋ Add customer</button>}
+        actions={canManage && <button className="btn primary" onClick={() => setEditing('new')}>＋ Add customer</button>}
       />
       <div className="stats">
         <StatCard label="Customers" value={customers.length} note={debounced ? 'Matching search' : 'In directory'} icon="♙" />
@@ -78,8 +79,8 @@ export default function CustomersPage() {
                     <td className="num">{fmtMoney(c.outstanding)}</td>
                     <td><Badge>{c.orderCount === 0 ? 'New' : c.outstanding ? 'Balance due' : 'Settled'}</Badge></td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <button className="btn small" onClick={() => setEditing(c)}>Edit</button>{' '}
-                      {user.role === 'owner' && c.orderCount === 0 && <button className="btn small danger" onClick={() => remove(c)}>Delete</button>}
+                      {canManage && <button className="btn small" onClick={() => setEditing(c)}>Edit</button>}{canManage && ' '}
+                      {meta.permissions.includes('customers.delete') && c.orderCount === 0 && <button className="btn small danger" onClick={() => remove(c)}>Delete</button>}
                     </td>
                   </tr>
                 ))}

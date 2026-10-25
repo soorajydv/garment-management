@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { Payment } from '../models/Payment';
 import { Order } from '../models/Order';
-import { currentUser, requireRole } from '../middleware/auth';
+import { currentUser, requirePermission } from '../middleware/auth';
 import { PAYMENT_METHODS } from '../lib/constants';
 import { assertObjectId, badRequest, conflict, notFound, pagination, parse } from '../lib/http';
 import { loadOrderForUser } from '../lib/workflow';
@@ -32,7 +32,7 @@ const toDto = (p: Record<string, any>) => ({
   recordedBy: p.recordedBy && typeof p.recordedBy === 'object' && 'name' in p.recordedBy ? p.recordedBy.name : '',
 });
 
-router.get('/', requireRole('owner', 'accounts', 'customer'), async (req, res) => {
+router.get('/', requirePermission('payments.view'), async (req, res) => {
   const user = currentUser(req);
   const { limit, skip, page } = pagination(req.query as Record<string, unknown>, 100);
   const filter: Record<string, unknown> = {};
@@ -67,7 +67,7 @@ const createSchema = z.object({
   receivedAt: z.coerce.date().optional(),
 });
 
-router.post('/', requireRole('owner', 'accounts'), async (req, res) => {
+router.post('/', requirePermission('payments.record'), async (req, res) => {
   const user = currentUser(req);
   const body = parse(createSchema, req.body);
   const order = await loadOrderForUser(assertObjectId(body.orderId, 'Order'), user);
@@ -91,7 +91,7 @@ router.post('/', requireRole('owner', 'accounts'), async (req, res) => {
   res.status(201).json({ payment: toDto(saved!) });
 });
 
-router.delete('/:id', requireRole('owner'), async (req, res) => {
+router.delete('/:id', requirePermission('payments.delete'), async (req, res) => {
   const user = currentUser(req);
   const id = assertObjectId(req.params.id, 'Payment');
   const payment = await Payment.findById(id).populate('order', 'orderNo');

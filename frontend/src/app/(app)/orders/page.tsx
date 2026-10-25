@@ -41,7 +41,7 @@ export default function OrdersPage() {
         eyebrow={isCustomer ? 'CUSTOMER PORTAL' : 'ORDER REGISTER'}
         title={isCustomer ? 'My orders' : 'Order management'}
         subtitle="Track every order from first request through delivery."
-        actions={['owner', 'accounts', 'customer'].includes(user.role) && <Link href="/orders/new" className="btn primary">＋ {isCustomer ? 'Place an order' : 'Create order'}</Link>}
+        actions={meta.permissions.includes('orders.create') && <Link href="/orders/new" className="btn primary">＋ {isCustomer ? 'Place an order' : 'Create order'}</Link>}
       />
       <div className="toolbar">
         <div className="search">
@@ -60,7 +60,7 @@ export default function OrdersPage() {
         </label>
       </div>
       {error && <Notice tone="error">{error}</Notice>}
-      <div className="card flush">{!data && loading ? <Spinner /> : <OrderTable orders={data?.orders ?? []} showMoney={canSeeMoney(user.role)} />}</div>
+  <div className="card flush">{!data && loading ? <Spinner /> : <OrderTable orders={data?.orders ?? []} showMoney={canSeeMoney(user.role, meta.permissions)} />}</div>
       {data && (
         <div className="toolbar" style={{ marginTop: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           <div className="subtitle">{data.total} order{data.total === 1 ? '' : 's'}{user.role !== 'owner' && user.role !== 'accounts' && !isCustomer ? ' in your department queue' : ''}</div>

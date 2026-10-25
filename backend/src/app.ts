@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { requireAuth } from './middleware/auth';
 import { errorHandler, notFoundHandler } from './middleware/error';
-import authRoutes from './routes/auth';
+import authRoutes from './features/auth/auth.route';
 import userRoutes from './routes/users';
 import customerRoutes from './routes/customers';
 import orderRoutes from './routes/orders';
@@ -16,6 +16,8 @@ import dashboardRoutes from './routes/dashboard';
 import reportRoutes from './routes/reports';
 import { auditRouter, metaRouter, settingsRouter } from './routes/settings';
 import notificationRoutes from './routes/notifications';
+import attendanceRoutes from './features/attendance/attendance.route';
+import roleRoutes from './routes/roles';
 
 export function createApp() {
   const app = express();
@@ -37,6 +39,8 @@ export function createApp() {
   api.use('/meta', metaRouter);
   api.use('/dashboard', dashboardRoutes);
   api.use('/notifications', notificationRoutes);
+  api.use('/attendance', attendanceRoutes);
+  api.use('/roles', roleRoutes);
   api.use('/orders', orderRoutes);
   api.use('/customers', customerRoutes);
   api.use('/payments', paymentRoutes);

@@ -1,15 +1,17 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
-import { User } from '../models/User';
+import { User } from '../models/user.model';
 import { HttpError, forbidden } from '../lib/http';
-import type { Role } from '../lib/constants';
+import { type Permission, type Role } from '../lib/constants';
+import { permissionsForUserRole } from '../lib/roles';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   role: Role;
+  permissions: Permission[];
   customerId: string | null;
 }
 
@@ -53,6 +55,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     name: user.name,
     email: user.email,
     role: user.role as Role,
+    permissions: await permissionsForUserRole(user.role),
     customerId: user.customer ? String(user.customer) : null,
   };
   next();
@@ -61,6 +64,24 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 export function requireRole(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) throw forbidden();
+    next();
+  };
+}
+
+export function requirePermission(permission: Permission) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user || !req.user.permissions.includes(permission)) {
+      throw forbidden(`You do not have permission to ${permission.replace('.', ' ')}`);
+    }
+    next();
+  };
+}
+
+export function requireAnyPermission(...permissions: Permission[]) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user || !permissions.some((permission) => req.user!.permissions.includes(permission))) {
+      throw forbidden('You do not have permission to perform this action');
+    }
     next();
   };
 }

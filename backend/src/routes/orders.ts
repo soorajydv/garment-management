@@ -6,7 +6,7 @@ import { Customer } from '../models/Customer';
 import { Payment } from '../models/Payment';
 import { getSettings } from '../models/Settings';
 import { nextSequence } from '../models/Counter';
-import { currentUser, requireRole, type AuthUser } from '../middleware/auth';
+import { currentUser, requirePermission, type AuthUser } from '../middleware/auth';
 import {
   DELIVERY_METHODS, NECK_TYPES, PAYMENT_METHODS, PRODUCT_CONFIGS, SIZES, SLEEVES, STAGE_LABELS, STAGES, type Stage,
 } from '../lib/constants';
@@ -94,7 +94,7 @@ async function respond(order: OrderDoc, user: AuthUser) {
 
 // ---------- list & read ----------
 
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('orders.view'), async (req, res) => {
   const user = currentUser(req);
   const { page, limit, skip } = pagination(req.query as Record<string, unknown>);
   const filter: Record<string, unknown> = { ...orderScope(user) };
@@ -123,7 +123,7 @@ router.get('/', async (req, res) => {
   res.json({ orders: orders.map((o) => serializeOrder(o, user)), total, page, limit });
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', requirePermission('orders.view'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   res.json(await respond(order, user));
@@ -133,7 +133,7 @@ router.get('/:id', async (req, res) => {
 
 router.post(
   '/',
-  requireRole('owner', 'accounts', 'customer'),
+  requirePermission('orders.create'),
   upload.fields([{ name: 'jerseyImage', maxCount: 1 }, { name: 'files', maxCount: 10 }]),
   async (req, res) => {
     const user = currentUser(req);
@@ -212,7 +212,7 @@ router.post(
   },
 );
 
-router.patch('/:id', requireRole('owner', 'accounts'), async (req, res) => {
+router.patch('/:id', requirePermission('orders.update'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   const body = parse(updateSchema, req.body);
@@ -247,7 +247,7 @@ router.patch('/:id', requireRole('owner', 'accounts'), async (req, res) => {
   res.json(await respond(order, user));
 });
 
-router.delete('/:id', requireRole('owner'), async (req, res) => {
+router.delete('/:id', requirePermission('orders.delete'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   if (order.stage !== 'design') throw conflict('Only orders still in Design & confirmation can be deleted');
@@ -261,7 +261,7 @@ router.delete('/:id', requireRole('owner'), async (req, res) => {
 
 // ---------- artwork & approval ----------
 
-router.post('/:id/artworks', requireRole('owner', 'design'), upload.single('file'), async (req, res) => {
+router.post('/:id/artworks', requirePermission('orders.artwork.upload'), upload.single('file'), async (req, res) => {
   const user = currentUser(req);
   try {
     const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
@@ -287,7 +287,7 @@ router.post('/:id/artworks', requireRole('owner', 'design'), upload.single('file
   }
 });
 
-router.post('/:id/approve', requireRole('owner', 'customer'), async (req, res) => {
+router.post('/:id/approve', requirePermission('orders.approve'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   const { version } = parse(z.object({ version: z.coerce.number().int().min(1) }), req.body);
@@ -304,7 +304,7 @@ router.post('/:id/approve', requireRole('owner', 'customer'), async (req, res) =
   res.json(await respond(order, user));
 });
 
-router.post('/:id/feedback', requireRole('owner', 'design', 'customer'), async (req, res) => {
+router.post('/:id/feedback', requirePermission('orders.feedback'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   const { message } = parse(z.object({ message: z.string().trim().min(2).max(2000) }), req.body);
@@ -324,7 +324,7 @@ router.post('/:id/feedback', requireRole('owner', 'design', 'customer'), async (
 
 // ---------- production workflow ----------
 
-router.post('/:id/advance', async (req, res) => {
+router.post('/:id/advance', requirePermission('orders.stage.complete'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   const { note } = parse(z.object({ note: z.string().trim().max(500).optional().default('') }), req.body ?? {});
@@ -344,7 +344,7 @@ router.post('/:id/advance', async (req, res) => {
   res.json(await respond(order, user));
 });
 
-router.post('/:id/send-back', requireRole('owner'), async (req, res) => {
+router.post('/:id/send-back', requirePermission('orders.send_back'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   const { reason } = parse(z.object({ reason: z.string().trim().min(3, 'Give a reason for rework').max(500) }), req.body);
@@ -367,7 +367,7 @@ const deliverSchema = z.object({
   note: z.string().trim().max(500).optional().default(''),
 });
 
-router.post('/:id/deliver', requireRole('owner'), async (req, res) => {
+router.post('/:id/deliver', requirePermission('orders.deliver'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   const body = parse(deliverSchema, req.body);
@@ -385,7 +385,7 @@ router.post('/:id/deliver', requireRole('owner'), async (req, res) => {
 
 // ---------- invoice ----------
 
-router.post('/:id/invoice', requireRole('owner', 'accounts'), async (req, res) => {
+router.post('/:id/invoice', requirePermission('orders.invoice'), async (req, res) => {
   const user = currentUser(req);
   const order = await loadOrderForUser(assertObjectId(req.params.id, 'Order'), user);
   if (order.invoice?.number) throw conflict(`Invoice ${order.invoice.number} was already issued`);

@@ -1,4 +1,17 @@
-export type Role = 'owner' | 'design' | 'printing' | 'stitching' | 'finishing' | 'accounts' | 'customer';
+export type Role = string;
+export type Permission =
+  | 'dashboard.view' | 'orders.view' | 'orders.create' | 'orders.update' | 'orders.delete' | 'orders.artwork.upload' | 'orders.approve' | 'orders.feedback' | 'orders.stage.complete' | 'orders.send_back' | 'orders.deliver' | 'orders.invoice'
+  | 'customers.view' | 'customers.manage' | 'customers.delete' | 'payments.view' | 'payments.record' | 'payments.delete'
+  | 'inventory.view' | 'inventory.manage' | 'inventory.move' | 'inventory.adjust' | 'reports.view' | 'users.manage' | 'settings.view' | 'settings.manage' | 'audit.view'
+  | 'roles.manage' | 'profile.manage' | 'account.delete' | 'attendance.view' | 'attendance.checkin' | 'attendance.checkout' | 'attendance.approve';
+
+export interface RoleDefinition {
+  key: Role;
+  name: string;
+  description: string;
+  permissions: Permission[];
+  system: boolean;
+}
 export type Stage = 'design' | 'printing' | 'stitching' | 'finishing' | 'ready' | 'delivered';
 
 export interface Me {
@@ -11,7 +24,7 @@ export interface Me {
 }
 
 export interface Meta {
-  roles: Role[];
+  roles: RoleDefinition[];
   stages: { key: Stage; label: string }[];
   productConfigs: string[];
   neckTypes: string[];
@@ -20,6 +33,8 @@ export interface Meta {
   paymentMethods: string[];
   deliveryMethods: string[];
   inventoryCategories: string[];
+  permissions: Permission[];
+  availablePermissions: Permission[];
 }
 
 export interface Settings {
@@ -167,4 +182,18 @@ export interface AuditEntry {
   entity?: string;
   summary: string;
   at: string;
+}
+
+export type AttendanceStatus = 'pending' | 'approved' | 'rejected';
+
+export interface AttendanceRecord {
+  id: string;
+  user: { id: string; name: string; email: string; role: Role | string };
+  checkInAt: string;
+  checkOutAt: string | null;
+  status: AttendanceStatus;
+  approvedAt: string | null;
+  approvedBy: { id: string; name: string } | null;
+  rejectionReason: string;
+  createdAt: string;
 }

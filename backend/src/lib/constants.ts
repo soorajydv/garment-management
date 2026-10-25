@@ -1,6 +1,39 @@
 export const ROLES = ['owner', 'design', 'printing', 'stitching', 'finishing', 'accounts', 'customer'] as const;
-export type Role = (typeof ROLES)[number];
-export const STAFF_ROLES: Role[] = ROLES.filter((r) => r !== 'customer');
+export type BuiltInRole = (typeof ROLES)[number];
+export type Role = string;
+export const STAFF_ROLES: BuiltInRole[] = ROLES.filter((r) => r !== 'customer');
+
+/** Feature permissions used by the API and mirrored by the frontend for UI visibility. */
+export const PERMISSIONS = [
+  'dashboard.view',
+  'orders.view', 'orders.create', 'orders.update', 'orders.delete', 'orders.artwork.upload', 'orders.approve', 'orders.feedback', 'orders.stage.complete', 'orders.send_back', 'orders.deliver', 'orders.invoice',
+  'customers.view', 'customers.manage', 'customers.delete',
+  'payments.view', 'payments.record', 'payments.delete',
+  'inventory.view', 'inventory.manage', 'inventory.move', 'inventory.adjust',
+  'reports.view', 'users.manage', 'settings.view', 'settings.manage', 'audit.view',
+  'roles.manage',
+  'profile.manage', 'account.delete',
+  'attendance.view', 'attendance.checkin', 'attendance.checkout', 'attendance.approve',
+] as const;
+export type Permission = (typeof PERMISSIONS)[number];
+
+const allPermissions = [...PERMISSIONS] as Permission[];
+const profilePermissions: Permission[] = ['profile.manage', 'account.delete'];
+const staffAttendance: Permission[] = ['attendance.view', 'attendance.checkin', 'attendance.checkout'];
+
+export const ROLE_PERMISSIONS: Record<BuiltInRole, Permission[]> = {
+  owner: allPermissions,
+  design: ['dashboard.view', 'orders.view', 'orders.artwork.upload', 'orders.feedback', 'orders.stage.complete', 'inventory.view', 'inventory.move', 'settings.view', ...staffAttendance, ...profilePermissions],
+  printing: ['dashboard.view', 'orders.view', 'orders.stage.complete', 'inventory.view', 'inventory.move', 'settings.view', ...staffAttendance, ...profilePermissions],
+  stitching: ['dashboard.view', 'orders.view', 'orders.stage.complete', 'inventory.view', 'inventory.move', 'settings.view', ...staffAttendance, ...profilePermissions],
+  finishing: ['dashboard.view', 'orders.view', 'orders.stage.complete', 'inventory.view', 'inventory.move', 'settings.view', ...staffAttendance, ...profilePermissions],
+  accounts: ['dashboard.view', 'orders.view', 'orders.create', 'orders.update', 'orders.invoice', 'customers.view', 'customers.manage', 'payments.view', 'payments.record', 'reports.view', 'settings.view', ...staffAttendance, ...profilePermissions],
+  customer: ['dashboard.view', 'orders.view', 'orders.create', 'orders.approve', 'orders.feedback', 'payments.view', 'settings.view', ...profilePermissions],
+};
+
+export function permissionsForRole(role: Role) {
+  return ROLE_PERMISSIONS[role as BuiltInRole] ?? [];
+}
 
 /** Roles allowed to see prices, payments and invoices (customers see only their own). */
 export const FINANCE_ROLES: Role[] = ['owner', 'accounts', 'customer'];

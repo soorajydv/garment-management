@@ -9,7 +9,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import mongoose, { Types } from 'mongoose';
 import { env } from './config/env';
-import { User } from './models/User';
+import { User } from './models/user.model';
 import { Customer } from './models/Customer';
 import { Order } from './models/Order';
 import { Payment } from './models/Payment';
@@ -18,6 +18,7 @@ import { Counter } from './models/Counter';
 import { getSettings } from './models/Settings';
 import { computeStatus } from './lib/workflow';
 import { STAGES, type Stage } from './lib/constants';
+import { ensureSystemRoles } from './lib/roles';
 
 export const DEMO_PASSWORD = 'Password@123';
 
@@ -166,6 +167,7 @@ export async function seedIfEmpty() {
 
 export async function seed() {
   console.log('Seeding demo data…');
+  await ensureSystemRoles();
   await getSettings();
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
   const users = Object.fromEntries(

@@ -3,13 +3,13 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 import { Customer } from '../models/Customer';
 import { Order } from '../models/Order';
-import { User } from '../models/User';
-import { currentUser, requireRole } from '../middleware/auth';
+import { User } from '../models/user.model';
+import { currentUser, requirePermission } from '../middleware/auth';
 import { assertObjectId, conflict, escapeRegex, notFound, parse } from '../lib/http';
 import { audit } from '../lib/audit';
 
 const router = Router();
-router.use(requireRole('owner', 'accounts'));
+router.use(requirePermission('customers.view'));
 
 const customerSchema = z.object({
   name: z.string().trim().min(2, 'Name is required'),
@@ -80,7 +80,7 @@ router.get('/:id', async (req, res) => {
   });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('customers.manage'), async (req, res) => {
   const me = currentUser(req);
   const body = parse(customerSchema, req.body);
   const customer = await Customer.create(body);
@@ -88,7 +88,7 @@ router.post('/', async (req, res) => {
   res.status(201).json({ customer: toDto(customer.toObject()) });
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('customers.manage'), async (req, res) => {
   const me = currentUser(req);
   const id = assertObjectId(req.params.id, 'Customer');
   const body = parse(customerSchema.partial(), req.body);
@@ -99,7 +99,7 @@ router.patch('/:id', async (req, res) => {
   res.json({ customer: toDto(customer, totals.get(id)) });
 });
 
-router.delete('/:id', requireRole('owner'), async (req, res) => {
+router.delete('/:id', requirePermission('customers.delete'), async (req, res) => {
   const me = currentUser(req);
   const id = assertObjectId(req.params.id, 'Customer');
   if (await Order.exists({ customer: id })) throw conflict('This customer has orders and cannot be deleted');

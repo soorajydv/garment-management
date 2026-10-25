@@ -1,4 +1,4 @@
-import type { Role, Stage } from './types';
+import type { Permission, Role, RoleDefinition, Stage } from './types';
 
 export const fmtMoney = (n: number | undefined | null, currency = 'NPR') =>
   `${currency} ${Number(n ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -39,6 +39,9 @@ export const ROLE_LABELS: Record<Role, string> = {
   customer: 'Customer',
 };
 
+export const roleLabel = (role: Role, definitions?: RoleDefinition[]) =>
+  definitions?.find((definition) => definition.key === role)?.name ?? ROLE_LABELS[role] ?? role.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 export const STAGE_SHORT: Record<Stage, string> = {
   design: 'Design',
   printing: 'Printing',
@@ -51,12 +54,12 @@ export const STAGE_SHORT: Record<Stage, string> = {
 export const STAGE_ORDER: Stage[] = ['design', 'printing', 'stitching', 'finishing', 'ready', 'delivered'];
 
 export const FINANCE_ROLES: Role[] = ['owner', 'accounts', 'customer'];
-export const canSeeMoney = (role: Role) => FINANCE_ROLES.includes(role);
+export const canSeeMoney = (role: Role, permissions: Permission[] = []) => FINANCE_ROLES.includes(role) || permissions.includes('payments.view');
 
 /** Mirrors the server rule: who may complete each stage. */
-export function canCompleteStage(role: Role, stage: Stage) {
+export function canCompleteStage(role: Role, stage: Stage, permissions: Permission[] = []) {
   if (stage === 'ready' || stage === 'delivered') return role === 'owner';
-  return role === 'owner' || role === stage;
+  return role === 'owner' || role === stage || permissions.includes('orders.stage.complete');
 }
 
 export const initials = (name: string) =>

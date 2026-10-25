@@ -53,7 +53,7 @@ export function previousStage(stage: Stage): Stage | null {
 /** Owner can complete any production stage; departments only their own. Dispatch is owner-only. */
 export function canCompleteStage(user: AuthUser, stage: Stage): boolean {
   if (stage === 'ready' || stage === 'delivered') return user.role === 'owner';
-  return user.role === 'owner' || STAGE_DEPARTMENT[stage] === user.role;
+  return user.role === 'owner' || STAGE_DEPARTMENT[stage] === user.role || (!ROLE_STAGES[user.role] && user.permissions.includes('orders.stage.complete'));
 }
 
 /** Row-level visibility: customers see their own orders, departments see their queues. */
@@ -118,7 +118,7 @@ export function serializeOrder(order: SerializableOrder, user: AuthUser) {
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
   };
-  if (FINANCE_ROLES.includes(user.role)) {
+  if (user.permissions.includes('payments.view') || FINANCE_ROLES.includes(user.role)) {
     result.unitRate = o.unitRate;
     result.totalAmount = o.totalAmount;
     result.amountPaid = o.amountPaid;

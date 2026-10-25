@@ -21,6 +21,8 @@ export default function NewOrderPage() {
   const isCustomer = user.role === 'customer';
   const { data: customerData } = useApi<{ customers: Customer[] }>(isCustomer ? null : '/customers');
 
+  if (!meta.permissions.includes('orders.create')) return <Notice tone="error">You do not have permission to create orders.</Notice>;
+
   const defaultDue = new Date();
   defaultDue.setDate(defaultDue.getDate() + 14);
 

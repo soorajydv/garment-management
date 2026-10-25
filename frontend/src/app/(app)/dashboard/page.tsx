@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { Badge, DueDate, Empty, Notice, OrderTable, PageHeader, Spinner, StatCard } from '@/components/ui';
 import { canSeeMoney, fmtDateTime, fmtMoney, STAGE_SHORT } from '@/lib/format';
 import type { Order, Stage } from '@/lib/types';
+import { Icon } from '@/components/Icon';
 
 interface Dashboard {
   counts: { active: number; awaitingApproval: number; dueSoon: number; overdue: number; readyToDispatch: number; deliveredThisMonth: number };
@@ -25,10 +26,10 @@ function greeting() {
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, meta } = useAuth();
   const { data, error } = useApi<Dashboard>('/dashboard');
   const isCustomer = user.role === 'customer';
-  const canCreate = ['owner', 'accounts', 'customer'].includes(user.role);
+  const canCreate = meta.permissions.includes('orders.create');
 
   if (error) return <Notice tone="error">{error}</Notice>;
   if (!data) return <Spinner />;
@@ -118,7 +119,7 @@ export default function DashboardPage() {
               .filter((o) => !data.approvals.some((a) => a.id === o.id))
               .map((o) => (
                 <Link href={`/orders/${o.id}`} className="activity-item" key={`d-${o.id}`}>
-                  <div className="activity-dot">◷</div>
+                  <div className="activity-dot"><Icon name="attendance" size={15} /></div>
                   <div>
                     <div className="activity-title">{o.customer.name} · {o.orderNo}</div>
                     <div className="activity-desc">{o.stageLabel} · {o.quantity} sets</div>
@@ -162,9 +163,9 @@ export default function DashboardPage() {
               </div>
               <div style={{ display: 'grid', gap: 9 }}>
                 {canCreate && <Link className="btn" href="/orders/new" style={{ justifyContent: 'flex-start' }}>＋ {isCustomer ? 'Place a new order' : 'Register a new order'}</Link>}
-                {!isCustomer && user.role !== 'accounts' && <Link className="btn" href="/production" style={{ justifyContent: 'flex-start' }}>◫ Open production board</Link>}
-                {canSeeMoney(user.role) && <Link className="btn" href="/billing" style={{ justifyContent: 'flex-start' }}>▱ {isCustomer ? 'View invoices & payments' : 'Billing & payments'}</Link>}
-                {!isCustomer && user.role !== 'accounts' && <Link className="btn" href="/inventory" style={{ justifyContent: 'flex-start' }}>▧ Check stock levels</Link>}
+                {meta.permissions.includes('orders.stage.complete') && <Link className="btn" href="/production" style={{ justifyContent: 'flex-start' }}><Icon name="production" size={15} /> Open production board</Link>}
+                {canSeeMoney(user.role, meta.permissions) && <Link className="btn" href="/billing" style={{ justifyContent: 'flex-start' }}>▱ {isCustomer ? 'View invoices & payments' : 'Billing & payments'}</Link>}
+                {meta.permissions.includes('inventory.view') && <Link className="btn" href="/inventory" style={{ justifyContent: 'flex-start' }}><Icon name="inventory" size={15} /> Check stock levels</Link>}
               </div>
             </>
           )}

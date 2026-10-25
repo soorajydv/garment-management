@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getSettings, Settings } from '../models/Settings';
 import { AuditLog } from '../models/AuditLog';
-import { currentUser, requireRole } from '../middleware/auth';
+import { currentUser, requirePermission } from '../middleware/auth';
 import {
-  DELIVERY_METHODS, NECK_TYPES, PAYMENT_METHODS, PRODUCT_CONFIGS, ROLES, SIZES, SLEEVES, STAGE_LABELS, STAGES,
+  DELIVERY_METHODS, NECK_TYPES, PAYMENT_METHODS, PERMISSIONS, PRODUCT_CONFIGS, SIZES, SLEEVES, STAGE_LABELS, STAGES,
 } from '../lib/constants';
+import { listRoles, permissionsForUserRole } from '../lib/roles';
 import { INVENTORY_CATEGORIES } from '../models/Inventory';
 import { pagination, parse } from '../lib/http';
 import { audit } from '../lib/audit';
@@ -26,13 +27,13 @@ const dto = (s: Record<string, any>) => ({
   invoiceFooter: s.invoiceFooter,
 });
 
-settingsRouter.get('/', async (_req, res) => {
+settingsRouter.get('/', requirePermission('settings.view'), async (_req, res) => {
   res.json({ settings: dto((await getSettings()).toObject()) });
 });
 
 const prefix = z.string().trim().min(1).max(8).regex(/^[A-Z0-9]+$/, 'Use capital letters and numbers only');
 
-settingsRouter.put('/', requireRole('owner'), async (req, res) => {
+settingsRouter.put('/', requirePermission('settings.manage'), async (req, res) => {
   const user = currentUser(req);
   const body = parse(
     z.object({
@@ -56,9 +57,10 @@ settingsRouter.put('/', requireRole('owner'), async (req, res) => {
 
 /** Static option lists so the frontend never hard-codes business vocabulary. */
 export const metaRouter = Router();
-metaRouter.get('/', (_req, res) => {
+metaRouter.get('/', async (req, res) => {
+  const user = currentUser(req);
   res.json({
-    roles: ROLES,
+    roles: (await listRoles()).map((role) => ({ key: role.key, name: role.name, description: role.description ?? '', permissions: role.permissions ?? [], system: role.system })),
     stages: STAGES.map((s) => ({ key: s, label: STAGE_LABELS[s] })),
     productConfigs: PRODUCT_CONFIGS,
     neckTypes: NECK_TYPES,
@@ -67,11 +69,13 @@ metaRouter.get('/', (_req, res) => {
     paymentMethods: PAYMENT_METHODS,
     deliveryMethods: DELIVERY_METHODS,
     inventoryCategories: INVENTORY_CATEGORIES,
+    permissions: await permissionsForUserRole(user.role),
+    availablePermissions: PERMISSIONS,
   });
 });
 
 export const auditRouter = Router();
-auditRouter.get('/', requireRole('owner'), async (req, res) => {
+auditRouter.get('/', requirePermission('audit.view'), async (req, res) => {
   const { limit, skip, page } = pagination(req.query as Record<string, unknown>, 50);
   const [logs, total] = await Promise.all([
     AuditLog.find().sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),

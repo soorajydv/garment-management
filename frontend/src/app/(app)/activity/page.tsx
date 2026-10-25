@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useApi } from '@/lib/api';
 import { Empty, Notice, PageHeader, Spinner } from '@/components/ui';
-import { ROLE_LABELS, fmtDateTime } from '@/lib/format';
+import { roleLabel, fmtDateTime } from '@/lib/format';
 import type { AuditEntry, Role } from '@/lib/types';
 
 export default function ActivityPage() {
@@ -24,7 +24,7 @@ export default function ActivityPage() {
                 {data.logs.map((l) => (
                   <tr key={l.id}>
                     <td>{fmtDateTime(l.at)}</td>
-                    <td>{l.actorName}<div className="muted small">{l.actorRole ? ROLE_LABELS[l.actorRole as Role] : ''}</div></td>
+                    <td>{l.actorName}<div className="muted small">{l.actorRole ? roleLabel(l.actorRole as Role) : ''}</div></td>
                     <td><code className="small">{l.action}</code></td>
                     <td className="wrap">{l.summary}</td>
                   </tr>

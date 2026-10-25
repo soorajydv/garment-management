@@ -7,10 +7,12 @@ import { env } from './config/env';
 import { connectDb } from './db';
 import { createApp } from './app';
 import { seedIfEmpty } from './seed';
+import { ensureSystemRoles } from './lib/roles';
 
 async function main() {
   const mongo = await MongoMemoryServer.create();
   await connectDb(mongo.getUri('ss_textiles'));
+  await ensureSystemRoles();
   await seedIfEmpty();
   const server = createApp().listen(env.port, () => {
     console.log(`S & S Textiles API (in-memory MongoDB) listening on http://localhost:${env.port}`);

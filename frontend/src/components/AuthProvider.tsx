@@ -10,6 +10,7 @@ interface AuthState {
   meta: Meta;
   settings: Settings;
   refreshSettings: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -50,11 +51,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((s) => (s ? { ...s, settings } : s));
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const { user } = await api<{ user: Me }>('/auth/me');
+    setState((s) => (s ? { ...s, user } : s));
+  }, []);
+
   const logout = useCallback(async () => {
     await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
     router.replace('/login');
   }, [router]);
 
   if (!state) return <div className="spinner" aria-label="Loading" />;
-  return <AuthContext.Provider value={{ ...state, refreshSettings, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ ...state, refreshSettings, refreshUser, logout }}>{children}</AuthContext.Provider>;
 }

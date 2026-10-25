@@ -3,14 +3,14 @@ import { Order } from '../models/Order';
 import { InventoryItem } from '../models/Inventory';
 import { AuditLog } from '../models/AuditLog';
 import { getSettings } from '../models/Settings';
-import { currentUser } from '../middleware/auth';
+import { currentUser, requirePermission } from '../middleware/auth';
 import { FINANCE_ROLES, STAGES } from '../lib/constants';
 import { orderScope, serializeOrder } from '../lib/workflow';
 import { startOfToday } from './orders';
 
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('dashboard.view'), async (req, res) => {
   const user = currentUser(req);
   const scope = orderScope(user);
   const settings = await getSettings();
@@ -49,7 +49,7 @@ router.get('/', async (req, res) => {
     dueSoonOrders: dueSoonOrders.map((o) => serializeOrder(o, user)),
   };
 
-  if (FINANCE_ROLES.includes(user.role)) {
+  if (user.permissions.includes('payments.view') || FINANCE_ROLES.includes(user.role)) {
     const total = money[0]?.total ?? 0;
     const paid = money[0]?.paid ?? 0;
     result.money = { orderValue: total, collected: paid, outstanding: Math.max(0, total - paid) };
@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
   if (user.role !== 'customer') {
     result.lowStock = await InventoryItem.countDocuments({ active: true, $expr: { $lt: ['$onHand', '$reorderLevel'] } });
   }
-  if (user.role === 'owner') {
+  if (user.permissions.includes('audit.view')) {
     const logs = await AuditLog.find({ action: { $ne: 'auth.login' } }).sort({ createdAt: -1 }).limit(8).lean();
     result.activity = logs.map((l) => ({ id: String(l._id), actorName: l.actorName, action: l.action, summary: l.summary, at: l.createdAt }));
   }

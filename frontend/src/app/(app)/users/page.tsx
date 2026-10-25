@@ -5,7 +5,7 @@ import { api, useApi } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { Badge, Field, Modal, Notice, PageHeader, Spinner, errorMessage } from '@/components/ui';
-import { ROLE_LABELS, fmtDateTime } from '@/lib/format';
+import { roleLabel, fmtDateTime } from '@/lib/format';
 import type { Customer, Role, UserRow } from '@/lib/types';
 
 const ROLE_SCOPE: Record<Role, string> = {
@@ -19,12 +19,24 @@ const ROLE_SCOPE: Record<Role, string> = {
 };
 
 export default function UsersPage() {
-  const { user: me } = useAuth();
+  const { user: me, meta } = useAuth();
+  const toast = useToast();
   const { data, error, reload } = useApi<{ users: UserRow[] }>('/users');
   const [editing, setEditing] = useState<UserRow | 'new' | null>(null);
   const [resetting, setResetting] = useState<UserRow | null>(null);
 
-  if (me.role !== 'owner') return <Notice tone="error">Only the owner can manage users.</Notice>;
+  async function remove(user: UserRow) {
+    if (!confirm(`Delete ${user.name}'s account? This cannot be undone.`)) return;
+    try {
+      await api(`/users/${user.id}`, { method: 'DELETE' });
+      toast(`${user.name}'s account deleted`);
+      reload();
+    } catch (err) {
+      toast(errorMessage(err), 'error');
+    }
+  }
+
+  if (!meta.permissions.includes('users.manage')) return <Notice tone="error">You do not have permission to manage users.</Notice>;
 
   return (
     <>
@@ -44,13 +56,14 @@ export default function UsersPage() {
                 {data.users.map((u) => (
                   <tr key={u.id} style={{ opacity: u.active ? 1 : 0.55 }}>
                     <td><strong>{u.name}</strong><div className="muted small" style={{ marginTop: 3 }}>{u.email}</div></td>
-                    <td>{ROLE_LABELS[u.role]}{u.customer && <div className="muted small" style={{ marginTop: 3 }}>{u.customer.name}</div>}</td>
-                    <td className="wrap muted">{ROLE_SCOPE[u.role]}</td>
+                    <td>{roleLabel(u.role, meta.roles)}{u.customer && <div className="muted small" style={{ marginTop: 3 }}>{u.customer.name}</div>}</td>
+                    <td className="wrap muted">{ROLE_SCOPE[u.role] ?? 'Custom role permissions'}</td>
                     <td>{u.lastLoginAt ? fmtDateTime(u.lastLoginAt) : <span className="muted">Never</span>}</td>
                     <td><Badge>{u.active ? 'Active' : 'Inactive'}</Badge></td>
                     <td>
                       <button className="btn small" onClick={() => setEditing(u)}>Edit</button>{' '}
-                      <button className="btn small" onClick={() => setResetting(u)}>Reset password</button>
+                      <button className="btn small" onClick={() => setResetting(u)}>Reset password</button>{' '}
+                      {u.id !== me.id && <button className="btn small danger" onClick={() => remove(u)}>Delete</button>}
                     </td>
                   </tr>
                 ))}
@@ -130,9 +143,9 @@ function UserModal({ user, onClose, onSaved }: { user: UserRow | null; onClose: 
         <div className="form-grid">
           <Field label="Full name *"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <Field label="Email (sign-in) *"><input type="email" required disabled={!!user} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-          <Field label="Role *" hint={ROLE_SCOPE[form.role]}>
+          <Field label="Role *" hint={ROLE_SCOPE[form.role] ?? 'Custom role permissions'}>
             <select value={form.role} disabled={self} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
-              {meta.roles.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+              {meta.roles.map((r) => <option key={r.key} value={r.key}>{r.name}</option>)}
             </select>
           </Field>
           <Field label="Phone"><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>

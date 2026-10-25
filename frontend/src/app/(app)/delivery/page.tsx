@@ -12,12 +12,12 @@ import type { Order } from '@/lib/types';
 type List = { orders: Order[]; total: number };
 
 export default function DeliveryPage() {
-  const { user } = useAuth();
+  const { user, meta } = useAuth();
   const ready = useApi<List>('/orders?stage=ready&limit=200');
   const finishing = useApi<List>('/orders?stage=finishing&limit=200');
   const delivered = useApi<List>(user.role === 'finishing' ? null : '/orders?stage=delivered&limit=15');
   const [dispatching, setDispatching] = useState<Order | null>(null);
-  const money = canSeeMoney(user.role);
+  const money = canSeeMoney(user.role, meta.permissions);
 
   const queue = [...(ready.data?.orders ?? []), ...(finishing.data?.orders ?? [])];
 
@@ -47,7 +47,7 @@ export default function DeliveryPage() {
                     <td><DueDate order={o} /></td>
                     {money && <td className={`num ${o.balance ? 'amber' : ''}`}>{fmtMoney(o.balance)}</td>}
                     <td>
-                      {o.stage === 'ready' && user.role === 'owner' ? (
+                      {o.stage === 'ready' && meta.permissions.includes('orders.deliver') ? (
                         <button className="btn small primary" onClick={() => setDispatching(o)}>Confirm dispatch</button>
                       ) : (
                         <span className="muted small">{o.stage === 'ready' ? 'Waiting for owner' : 'In QC / packing'}</span>

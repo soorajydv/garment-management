@@ -11,9 +11,11 @@ import type { InventoryItem, StockMovement } from '@/lib/types';
 type MoveType = 'in' | 'out' | 'adjust';
 
 export default function InventoryPage() {
-  const { user } = useAuth();
-  const isOwner = user.role === 'owner';
-  const items = useApi<{ items: InventoryItem[] }>(`/inventory/items${isOwner ? '?all=1' : ''}`);
+  const { meta } = useAuth();
+  const canManage = meta.permissions.includes('inventory.manage');
+  const canMove = meta.permissions.includes('inventory.move');
+  const canAdjust = meta.permissions.includes('inventory.adjust');
+  const items = useApi<{ items: InventoryItem[] }>(`/inventory/items${canManage ? '?all=1' : ''}`);
   const movements = useApi<{ movements: StockMovement[] }>('/inventory/movements?limit=20');
   const [category, setCategory] = useState('');
   const [moving, setMoving] = useState<{ item: InventoryItem; type: MoveType } | null>(null);
@@ -33,7 +35,7 @@ export default function InventoryPage() {
         eyebrow="MATERIALS CONTROL"
         title="Inventory & materials"
         subtitle="Fabric, printing consumables, thread, trims and packaging. Record stock received and issued to the floor."
-        actions={isOwner && <button className="btn primary" onClick={() => setEditing('new')}>＋ Add material</button>}
+        actions={canManage && <button className="btn primary" onClick={() => setEditing('new')}>＋ Add material</button>}
       />
       <div className="stats">
         <StatCard label="Tracked materials" value={items.data?.items.filter((i) => i.active).length ?? '—'} note="Active SKUs" icon="▧" />
@@ -74,10 +76,10 @@ export default function InventoryPage() {
                     <td className="num">{i.reorderLevel} {i.unit}</td>
                     <td><Badge>{!i.active ? 'Inactive' : i.lowStock ? 'Reorder needed' : 'In stock'}</Badge></td>
                     <td>
-                      <button className="btn small" onClick={() => setMoving({ item: i, type: 'in' })}>＋ In</button>{' '}
-                      <button className="btn small" onClick={() => setMoving({ item: i, type: 'out' })}>− Issue</button>{' '}
-                      {isOwner && <button className="btn small" onClick={() => setMoving({ item: i, type: 'adjust' })}>Count</button>}{' '}
-                      {isOwner && <button className="btn small" onClick={() => setEditing(i)}>Edit</button>}
+                      {canMove && <><button className="btn small" onClick={() => setMoving({ item: i, type: 'in' })}>＋ In</button>{' '}
+                      <button className="btn small" onClick={() => setMoving({ item: i, type: 'out' })}>− Issue</button>{' '}</>}
+                      {canAdjust && <button className="btn small" onClick={() => setMoving({ item: i, type: 'adjust' })}>Count</button>}{' '}
+                      {canManage && <button className="btn small" onClick={() => setEditing(i)}>Edit</button>}
                     </td>
                   </tr>
                 ))}

@@ -1,0 +1,74 @@
+import bcrypt from 'bcryptjs';
+import { Customer } from '../../models/Customer';
+import { User } from '../../models/user.model';
+import { audit } from '../../lib/audit';
+import { badRequest, HttpError } from '../../lib/http';
+import { signToken } from '../../middleware/auth';
+import type { AuthUser } from '../../middleware/auth';
+import { permissionsForUserRole } from '../../lib/roles';
+
+export async function login(email: string, password: string) {
+  const user = await User.findOne({ email }).select('+passwordHash');
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    throw new HttpError(401, 'Incorrect email or password');
+  }
+  if (!user.active) throw new HttpError(403, 'This account has been deactivated');
+
+  user.lastLoginAt = new Date();
+  await user.save();
+  const token = signToken(String(user._id));
+  await audit(
+    { id: String(user._id), name: user.name, email: user.email, role: user.role as never, customerId: null, permissions: await permissionsForUserRole(user.role) },
+    'auth.login', 'User', String(user._id), `${user.name} signed in`,
+  );
+
+  return { token, user: await getProfile(String(user._id)) };
+}
+
+export async function getProfile(userId: string) {
+  const user = await User.findById(userId).lean();
+  if (!user) throw new HttpError(401, 'Account not found');
+  const customer = user.customer ? await Customer.findById(user.customer).select('name').lean() : null;
+  return {
+    id: String(user._id),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    phone: user.phone,
+    customer: customer ? { id: String(customer._id), name: customer.name } : null,
+  };
+}
+
+export async function changePassword(
+  userId: string,
+  actor: AuthUser,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const user = await User.findById(userId).select('+passwordHash');
+  if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    throw badRequest('Current password is incorrect');
+  }
+  user.passwordHash = await bcrypt.hash(newPassword, 10);
+  await user.save();
+  await audit(actor, 'auth.password_changed', 'User', userId, `${actor.name} changed their password`);
+}
+
+export async function updateProfile(userId: string, actor: AuthUser, name: string, phone: string) {
+  const user = await User.findById(userId);
+  if (!user) throw new HttpError(404, 'Account not found');
+  user.name = name;
+  user.phone = phone;
+  await user.save();
+  await audit({ ...actor, name }, 'user.profile_updated', 'User', userId, `${name} updated their profile`);
+  return getProfile(userId);
+}
+
+export async function deleteAccount(userId: string, actor: AuthUser, password: string) {
+  const user = await User.findById(userId).select('+passwordHash');
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+    throw badRequest('Current password is incorrect');
+  }
+  await audit(actor, 'user.account_deleted', 'User', userId, `${user.name} deleted their account`);
+  await user.deleteOne();
+}

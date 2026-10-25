@@ -2,13 +2,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { InventoryItem, StockMovement, INVENTORY_CATEGORIES } from '../models/Inventory';
 import { Order } from '../models/Order';
-import { currentUser, requireRole } from '../middleware/auth';
-import { STAFF_ROLES } from '../lib/constants';
+import { currentUser, requireAnyPermission, requirePermission } from '../middleware/auth';
 import { assertObjectId, badRequest, conflict, notFound, parse } from '../lib/http';
 import { audit } from '../lib/audit';
 
 const router = Router();
-router.use(requireRole(...STAFF_ROLES));
+router.use(requirePermission('inventory.view'));
 
 const itemDto = (i: Record<string, any>) => ({
   id: String(i._id),
@@ -50,7 +49,7 @@ const itemSchema = z.object({
   openingStock: z.coerce.number().min(0).optional().default(0),
 });
 
-router.post('/items', requireRole('owner'), async (req, res) => {
+router.post('/items', requirePermission('inventory.manage'), async (req, res) => {
   const user = currentUser(req);
   const body = parse(itemSchema, req.body);
   const item = await InventoryItem.create({ ...body, onHand: body.openingStock });
@@ -61,7 +60,7 @@ router.post('/items', requireRole('owner'), async (req, res) => {
   res.status(201).json({ item: itemDto(item.toObject()) });
 });
 
-router.patch('/items/:id', requireRole('owner'), async (req, res) => {
+router.patch('/items/:id', requirePermission('inventory.manage'), async (req, res) => {
   const user = currentUser(req);
   const id = assertObjectId(req.params.id, 'Item');
   const body = parse(itemSchema.omit({ openingStock: true }).partial().extend({ active: z.boolean().optional() }), req.body);
@@ -79,12 +78,12 @@ const movementSchema = z.object({
   orderNo: z.string().trim().optional(),
 });
 
-router.post('/items/:id/movements', async (req, res) => {
+router.post('/items/:id/movements', requireAnyPermission('inventory.move', 'inventory.adjust'), async (req, res) => {
   const user = currentUser(req);
   const id = assertObjectId(req.params.id, 'Item');
   const body = parse(movementSchema, req.body);
   if (body.type !== 'adjust' && body.quantity <= 0) throw badRequest('quantity: Enter a quantity greater than zero');
-  if (body.type === 'adjust' && user.role !== 'owner') throw conflict('Only the owner can make stock count adjustments');
+  if (body.type === 'adjust' && !user.permissions.includes('inventory.adjust')) throw conflict('You do not have permission to make stock count adjustments');
   if (body.type === 'adjust' && !body.note) throw badRequest('note: Give a reason for the adjustment');
 
   let orderId = null;
