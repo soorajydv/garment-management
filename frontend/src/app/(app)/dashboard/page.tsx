@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useApi } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { Badge, DueDate, Empty, Notice, OrderTable, PageHeader, Spinner, StatCard } from '@/components/ui';
@@ -17,7 +18,7 @@ interface Dashboard {
   approvals: Order[];
   dueSoonOrders: Order[];
   lowStock?: number;
-  activity?: { id: string; actorName: string; summary: string; at: string }[];
+  activity?: { id: string; actorName: string; action: string; summary: string; at: string }[];
 }
 
 function greeting() {
@@ -25,9 +26,14 @@ function greeting() {
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
 }
 
+function activityLabel(action: string) {
+  return action.replace(/[._-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default function DashboardPage() {
   const { user, meta } = useAuth();
-  const { data, error } = useApi<Dashboard>('/dashboard');
+  const [recentOrdersSort, setRecentOrdersSort] = useState<'deadline' | 'recent'>('deadline');
+  const { data, error } = useApi<Dashboard>(`/dashboard?recentOrdersSort=${recentOrdersSort}`);
   const isCustomer = user.role === 'customer';
   const canCreate = meta.permissions.includes('orders.create');
 
@@ -64,9 +70,14 @@ export default function DashboardPage() {
               <h2>{isCustomer ? 'My recent orders' : 'Recent orders'}</h2>
               <div className="card-sub">Select an order number to open its detail view.</div>
             </div>
-            <Link className="link-btn" href="/orders">View all →</Link>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button className="link-btn" type="button" onClick={() => setRecentOrdersSort((sort) => sort === 'deadline' ? 'recent' : 'deadline')}>
+                    {recentOrdersSort === 'deadline' ? 'Recently added' : 'Nearest deadline'}
+                  </button>
+                  <Link className="link-btn" href="/orders">View all →</Link>
+                </div>
           </div>
-          <OrderTable orders={data.recentOrders} showMoney={false} compact />
+          <OrderTable orders={data.recentOrders} showMoney={false} compact showRemaining={recentOrdersSort === 'deadline'} />
         </section>
 
         <section className="card">
@@ -137,21 +148,22 @@ export default function DashboardPage() {
               <div className="card-head">
                 <div>
                   <h2>Recent activity</h2>
-                  <div className="card-sub">From the audit log</div>
+                  <div className="card-sub">Latest changes recorded in the audit log</div>
                 </div>
-                <Link className="link-btn" href="/activity">All →</Link>
+                <Link className="link-btn" href="/activity">View all →</Link>
               </div>
-              <div className="activity">
+              {!data.activity.length ? <Empty>No recent activity.</Empty> : <div className="audit-feed">
                 {data.activity.map((a) => (
-                  <div className="activity-item" key={a.id}>
-                    <div className="activity-dot">•</div>
-                    <div>
-                      <div className="activity-desc" style={{ marginTop: 0 }}>{a.summary}</div>
-                      <div className="activity-time">{a.actorName} · {fmtDateTime(a.at)}</div>
+                  <div className="audit-feed-item" key={a.id}>
+                    <div className="audit-feed-marker"><Icon name="activity" size={14} /></div>
+                    <div className="audit-feed-content">
+                      <div className="audit-feed-topline"><span className="audit-action">{activityLabel(a.action)}</span><span className="audit-feed-time">{fmtDateTime(a.at)}</span></div>
+                      <div className="audit-feed-summary">{a.summary || 'Activity recorded'}</div>
+                      <div className="audit-feed-actor">By <strong>{a.actorName}</strong></div>
                     </div>
                   </div>
                 ))}
-              </div>
+              </div>}
             </>
           ) : (
             <>

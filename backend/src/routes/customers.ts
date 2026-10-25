@@ -5,7 +5,7 @@ import { Customer } from '../models/Customer';
 import { Order } from '../models/Order';
 import { User } from '../models/user.model';
 import { currentUser, requirePermission } from '../middleware/auth';
-import { assertObjectId, conflict, escapeRegex, notFound, parse } from '../lib/http';
+import { assertObjectId, conflict, escapeRegex, notFound, pagination, parse } from '../lib/http';
 import { audit } from '../lib/audit';
 
 const router = Router();
@@ -56,13 +56,17 @@ const toDto = (c: Record<string, any>, t?: { orders: number; total: number; paid
 });
 
 router.get('/', async (req, res) => {
+  const { page, limit, skip } = pagination(req.query as Record<string, unknown>, 50);
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
   const filter = search
     ? { $or: ['name', 'contactPerson', 'phone', 'email'].map((f) => ({ [f]: { $regex: escapeRegex(search), $options: 'i' } })) }
     : {};
-  const customers = await Customer.find(filter).sort({ name: 1 }).limit(500).lean();
+  const [customers, total] = await Promise.all([
+    Customer.find(filter).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+    Customer.countDocuments(filter),
+  ]);
   const totals = await totalsFor(customers.map((c) => c._id));
-  res.json({ customers: customers.map((c) => toDto(c, totals.get(String(c._id)))) });
+  res.json({ customers: customers.map((c) => toDto(c, totals.get(String(c._id)))), total, page, limit });
 });
 
 router.get('/:id', async (req, res) => {

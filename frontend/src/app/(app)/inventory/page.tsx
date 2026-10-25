@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, useApi } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -15,15 +15,27 @@ export default function InventoryPage() {
   const canManage = meta.permissions.includes('inventory.manage');
   const canMove = meta.permissions.includes('inventory.move');
   const canAdjust = meta.permissions.includes('inventory.adjust');
-  const items = useApi<{ items: InventoryItem[] }>(`/inventory/items${canManage ? '?all=1' : ''}`);
-  const movements = useApi<{ movements: StockMovement[] }>('/inventory/movements?limit=20');
+  const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [stock, setStock] = useState('');
+  const [sort, setSort] = useState('name');
+  const [itemPage, setItemPage] = useState(1);
+  const [movementPage, setMovementPage] = useState(1);
   const [moving, setMoving] = useState<{ item: InventoryItem; type: MoveType } | null>(null);
   const [editing, setEditing] = useState<InventoryItem | 'new' | null>(null);
 
-  const list = (items.data?.items ?? []).filter((i) => !category || i.category === category);
-  const categories = [...new Set((items.data?.items ?? []).map((i) => i.category))];
-  const low = (items.data?.items ?? []).filter((i) => i.active && i.lowStock);
+  useEffect(() => setItemPage(1), [search, category, stock, sort]);
+  const itemParams = new URLSearchParams({ page: String(itemPage), limit: '50' });
+  if (canManage) itemParams.set('all', '1');
+  if (search.trim()) itemParams.set('search', search.trim());
+  if (category) itemParams.set('category', category);
+  if (stock) itemParams.set('stock', stock);
+  if (sort !== 'name') itemParams.set('sort', sort);
+  const items = useApi<{ items: InventoryItem[]; total: number; limit: number; lowStockTotal: number; activeTotal: number; categories: string[] }>(`/inventory/items?${itemParams}`);
+  const movements = useApi<{ movements: StockMovement[]; total: number; limit: number }>(`/inventory/movements?page=${movementPage}&limit=20`);
+  const list = items.data?.items ?? [];
+  const low = list.filter((i) => i.active && i.lowStock);
+  const categories = items.data?.categories ?? [];
   const refresh = () => {
     items.reload();
     movements.reload();
@@ -38,9 +50,9 @@ export default function InventoryPage() {
         actions={canManage && <button className="btn primary" onClick={() => setEditing('new')}>＋ Add material</button>}
       />
       <div className="stats">
-        <StatCard label="Tracked materials" value={items.data?.items.filter((i) => i.active).length ?? '—'} note="Active SKUs" icon="▧" />
-        <StatCard label="Low-stock alerts" value={low.length} note="Below reorder level" icon="!" tone={low.length ? 'amber' : 'green'} />
-        <StatCard label="Recent movements" value={movements.data?.movements.length ?? '—'} note="Last 20 shown below" icon="↔" />
+        <StatCard label="Tracked materials" value={items.data?.activeTotal ?? '—'} note="Active SKUs" icon="▧" />
+        <StatCard label="Low-stock alerts" value={items.data?.lowStockTotal ?? '—'} note="Below reorder level" icon="!" tone={items.data?.lowStockTotal ? 'amber' : 'green'} />
+        <StatCard label="Stock movements" value={movements.data?.total ?? '—'} note="Recorded movements" icon="↔" />
         <StatCard label="Categories" value={categories.length} icon="▤" />
       </div>
       {low.length > 0 && (
@@ -49,9 +61,19 @@ export default function InventoryPage() {
         </Notice>
       )}
       <div className="toolbar">
+        <div className="search"><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search material or SKU…" aria-label="Search inventory" /></div>
         <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
           <option value="">All categories</option>
           {categories.map((c) => <option key={c}>{c}</option>)}
+        </select>
+        <select value={stock} onChange={(e) => setStock(e.target.value)} aria-label="Stock status">
+          <option value="">All stock levels</option>
+          <option value="low">Reorder needed</option>
+        </select>
+        <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort inventory">
+          <option value="name">Category and name</option>
+          <option value="stock">Lowest stock first</option>
+          <option value="updated">Recently updated</option>
         </select>
       </div>
       {items.error && <Notice tone="error">{items.error}</Notice>}
@@ -88,6 +110,11 @@ export default function InventoryPage() {
           </div>
         )}
       </div>
+      {items.data && items.data.total > items.data.limit && <div className="toolbar" style={{ marginTop: -6, marginBottom: 16, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <button className="btn small" disabled={itemPage <= 1} onClick={() => setItemPage(itemPage - 1)}>← Prev</button>
+        <span className="small muted">Page {itemPage} of {Math.ceil(items.data.total / items.data.limit)}</span>
+        <button className="btn small" disabled={itemPage >= Math.ceil(items.data.total / items.data.limit)} onClick={() => setItemPage(itemPage + 1)}>Next →</button>
+      </div>}
 
       <section className="card flush">
         <div className="card-head" style={{ padding: '18px 18px 0' }}>
@@ -119,6 +146,11 @@ export default function InventoryPage() {
           </div>
         )}
       </section>
+      {movements.data && movements.data.total > movements.data.limit && <div className="toolbar" style={{ marginTop: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <button className="btn small" disabled={movementPage <= 1} onClick={() => setMovementPage(movementPage - 1)}>← Prev</button>
+        <span className="small muted">Page {movementPage} of {Math.ceil(movements.data.total / movements.data.limit)}</span>
+        <button className="btn small" disabled={movementPage >= Math.ceil(movements.data.total / movements.data.limit)} onClick={() => setMovementPage(movementPage + 1)}>Next →</button>
+      </div>}
 
       {moving && <MovementModal {...moving} onClose={() => setMoving(null)} onSaved={() => { setMoving(null); refresh(); }} />}
       {editing && <ItemModal item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} />}

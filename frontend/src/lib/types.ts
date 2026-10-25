@@ -48,6 +48,7 @@ export interface Settings {
   orderPrefix: string;
   invoicePrefix: string;
   dueSoonDays: number;
+  auditRetentionDays: number;
   invoiceFooter: string;
 }
 

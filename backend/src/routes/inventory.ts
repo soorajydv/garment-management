@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { InventoryItem, StockMovement, INVENTORY_CATEGORIES } from '../models/Inventory';
 import { Order } from '../models/Order';
 import { currentUser, requireAnyPermission, requirePermission } from '../middleware/auth';
-import { assertObjectId, badRequest, conflict, notFound, parse } from '../lib/http';
+import { assertObjectId, badRequest, conflict, escapeRegex, notFound, pagination, parse } from '../lib/http';
 import { audit } from '../lib/audit';
 
 const router = Router();
@@ -35,9 +35,25 @@ const movementDto = (m: Record<string, any>) => ({
 });
 
 router.get('/items', async (req, res) => {
+  const { page, limit, skip } = pagination(req.query as Record<string, unknown>, 50);
   const includeInactive = req.query.all === '1';
-  const items = await InventoryItem.find(includeInactive ? {} : { active: true }).sort({ category: 1, name: 1 }).lean();
-  res.json({ items: items.map(itemDto) });
+  const filter: Record<string, unknown> = includeInactive ? {} : { active: true };
+  const query = req.query as Record<string, string | undefined>;
+  if (query.category && (INVENTORY_CATEGORIES as readonly string[]).includes(query.category)) filter.category = query.category;
+  if (query.search?.trim()) {
+    const rx = { $regex: escapeRegex(query.search.trim()), $options: 'i' };
+    filter.$or = [{ name: rx }, { sku: rx }];
+  }
+  if (query.stock === 'low') filter.$expr = { $lt: ['$onHand', '$reorderLevel'] };
+  const sort: Record<string, 1 | -1> = query.sort === 'stock' ? { onHand: 1, name: 1 } : query.sort === 'updated' ? { updatedAt: -1, name: 1 } : { category: 1, name: 1 };
+  const [items, total, activeTotal, lowStockTotal, categories] = await Promise.all([
+    InventoryItem.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+    InventoryItem.countDocuments(filter),
+    InventoryItem.countDocuments({ ...filter, active: true }),
+    InventoryItem.countDocuments({ ...(includeInactive ? {} : { active: true }), $expr: { $lt: ['$onHand', '$reorderLevel'] } }),
+    InventoryItem.distinct('category', includeInactive ? {} : { active: true }),
+  ]);
+  res.json({ items: items.map(itemDto), total, page, limit, activeTotal, lowStockTotal, categories: categories.sort() });
 });
 
 const itemSchema = z.object({
@@ -115,15 +131,14 @@ router.post('/items/:id/movements', requireAnyPermission('inventory.move', 'inve
 });
 
 router.get('/movements', async (req, res) => {
+  const { page, limit, skip } = pagination(req.query as Record<string, unknown>, 20);
   const filter: Record<string, unknown> = {};
   if (typeof req.query.item === 'string') filter.item = assertObjectId(req.query.item, 'Item');
-  const movements = await StockMovement.find(filter)
-    .populate('item', 'name sku unit')
-    .populate('order', 'orderNo')
-    .sort({ createdAt: -1 })
-    .limit(Math.min(200, Number(req.query.limit) || 50))
-    .lean();
-  res.json({ movements: movements.map(movementDto) });
+  const [movements, total] = await Promise.all([
+    StockMovement.find(filter).populate('item', 'name sku unit').populate('order', 'orderNo').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    StockMovement.countDocuments(filter),
+  ]);
+  res.json({ movements: movements.map(movementDto), total, page, limit });
 });
 
 export default router;

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 import { initials, roleLabel } from '@/lib/format';
 import type { Permission } from '@/lib/types';
@@ -11,7 +11,7 @@ import { useTheme } from './ThemeProvider';
 import { Icon, type IconName } from './Icon';
 
 type NavItem = { href: string; label: string; icon: IconName; permission?: Permission };
-type NotificationItem = { id: string; type?: string; title: string; body: string; href: string };
+type NotificationItem = { id: string; type?: string; title: string; body: string; href: string; read: boolean };
 
 const NAV: { label: string; items: NavItem[] }[] = [
   {
@@ -65,10 +65,12 @@ const TITLES: Record<string, string> = {
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, meta, settings, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationsBusy, setNotificationsBusy] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const { theme, toggleTheme } = useTheme();
   const section = pathname.split('/')[1] || 'dashboard';
@@ -107,6 +109,29 @@ export function AppShell({ children }: { children: ReactNode }) {
   const visible = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.permission || meta.permissions.includes(i.permission)) })).filter((g) => g.items.length);
   const title = user.role === 'customer' && section === 'orders' ? 'My orders' : TITLES[section] ?? 'S & S Textiles';
   const notificationIcon = (type?: string): IconName => type === 'stock' ? 'inventory' : type === 'attendance' ? 'attendance' : type === 'approval' ? 'orders' : type === 'overdue' ? 'alert' : 'bell';
+  const unreadCount = notifications.filter((notification) => !notification.read).length;
+
+  async function markNotificationRead(id: string) {
+    setNotifications((current) => current.map((notification) => notification.id === id ? { ...notification, read: true } : notification));
+    try {
+      await api(`/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' });
+    } catch {
+      setNotifications((current) => current.map((notification) => notification.id === id ? { ...notification, read: false } : notification));
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    if (!unreadCount || notificationsBusy) return;
+    setNotificationsBusy(true);
+    setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+    try {
+      await api('/notifications/read-all', { method: 'POST' });
+    } catch {
+      setNotifications((current) => current.map((notification) => ({ ...notification, read: false })));
+    } finally {
+      setNotificationsBusy(false);
+    }
+  }
 
   return (
     <div className={`layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
@@ -143,19 +168,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main>
         <header className="topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <button className="icon-btn sidebar-toggle" aria-label="Toggle sidebar" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={toggleSidebar}><Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={19} /></button>
+            <button className="icon-btn sidebar-toggle" aria-label="Toggle sidebar" title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} onClick={toggleSidebar}><Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={19} className="sidebar-desktop-icon" /><Icon name="menu" size={19} className="sidebar-mobile-icon" /></button>
             <div>
-              <div className="breadcrumb">S&amp;S TEXTILES / {title}</div>
               <div className="page-title">{title}</div>
             </div>
           </div>
           <div className="top-actions">
             <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
             <div className="notification-wrap" ref={notificationRef}>
-              <button className="icon-btn" onClick={() => setNotificationsOpen((value) => !value)} aria-label="Open notifications" aria-expanded={notificationsOpen}><Icon name="bell" size={17} />{notifications.length > 0 && <span className="notification-dot">{notifications.length > 9 ? '9+' : notifications.length}</span>}</button>
+              <button className="icon-btn" onClick={() => setNotificationsOpen((value) => !value)} aria-label="Open notifications" aria-expanded={notificationsOpen}><Icon name="bell" size={17} />{unreadCount > 0 && <span className="notification-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}</button>
               {notificationsOpen && <div className="notification-menu">
-                <div className="notification-head"><div><h3>Notifications</h3><span>{notifications.length ? `${notifications.length} alert${notifications.length === 1 ? '' : 's'} to review` : 'You’re all caught up'}</span></div><button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications"><Icon name="close" size={15} /></button></div>
-                {notifications.length ? <div className="notification-list">{notifications.map((notification) => <Link key={notification.id} href={notification.href} className="notification-item" onClick={() => setNotificationsOpen(false)}><span className="notification-icon"><Icon name={notificationIcon(notification.type)} size={15} /></span><span className="notification-copy"><strong>{notification.title}</strong><span>{notification.body}</span></span></Link>)}</div> : <div className="empty">No new notifications.</div>}
+                <div className="notification-head"><div><h3>Notifications</h3><span>{unreadCount ? `${unreadCount} unread alert${unreadCount === 1 ? '' : 's'}` : 'You’re all caught up'}</span></div><div className="notification-head-actions">{unreadCount > 0 && <button className="notification-mark-all" onClick={markAllNotificationsRead} disabled={notificationsBusy}>{notificationsBusy ? 'Saving…' : 'Mark all as read'}</button>}<button className="notification-close" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications"><Icon name="close" size={15} /></button></div></div>
+                {notifications.length ? <div className="notification-list">{notifications.map((notification) => <Link key={notification.id} href={notification.href} className={`notification-item ${notification.read ? 'read' : ''}`} onClick={async (event) => { event.preventDefault(); await markNotificationRead(notification.id); setNotificationsOpen(false); router.push(notification.href); }}><span className="notification-icon"><Icon name={notificationIcon(notification.type)} size={15} /></span><span className="notification-copy"><strong>{notification.title}</strong><span>{notification.body}</span></span>{!notification.read && <span className="notification-unread" aria-label="Unread notification" />}</Link>)}</div> : <div className="empty">No new notifications.</div>}
               </div>}
             </div>
             <div className="user-chip">

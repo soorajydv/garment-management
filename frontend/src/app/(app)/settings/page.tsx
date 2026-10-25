@@ -40,9 +40,9 @@ export default function SettingsPage() {
     <>
       <PageHeader eyebrow="PLATFORM SETTINGS" title="Business profile" subtitle="Configure the business identity, numbering and defaults used across the platform." />
       {!canManage ? <Notice tone="warn">Platform settings are managed by an administrator.</Notice> : (
-        <section className="card" style={{ maxWidth: 900 }}>
-          {error && <Notice tone="error" style={{ marginBottom: 14 }}>{error}</Notice>}
-          <form onSubmit={save}>
+        <form onSubmit={save} style={{ maxWidth: 900, display: 'grid', gap: 16 }}>
+          <section className="card">
+            {error && <Notice tone="error" style={{ marginBottom: 14 }}>{error}</Notice>}
             <div className="form-grid">
               <Field label="Registered business name *" full><input required value={form.businessName} onChange={set('businessName')} /></Field>
               <Field label="Address" full><input value={form.address} onChange={set('address')} /></Field>
@@ -55,9 +55,9 @@ export default function SettingsPage() {
               <Field label="Due soon window (days)"><input type="number" min={1} max={30} value={form.dueSoonDays} onChange={set('dueSoonDays')} /></Field>
               <Field label="Invoice footer" full><input value={form.invoiceFooter} onChange={set('invoiceFooter')} /></Field>
             </div>
-            <button className="btn primary" style={{ marginTop: 16 }} disabled={busy}>{busy ? 'Saving…' : 'Save platform settings'}</button>
-          </form>
-        </section>
+          </section>
+          <button className="btn primary" disabled={busy}>{busy ? 'Saving…' : 'Save platform settings'}</button>
+        </form>
       )}
     </>
   );

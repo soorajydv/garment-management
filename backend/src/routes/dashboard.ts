@@ -31,7 +31,7 @@ router.get('/', requirePermission('dashboard.view'), async (req, res) => {
     Order.countDocuments({ ...notDelivered, dueDate: { $gte: today, $lt: soon } }),
     Order.countDocuments({ ...notDelivered, dueDate: { $lt: today } }),
     Order.countDocuments({ ...scope, $and: [{ stage: 'delivered' }, { 'delivery.deliveredAt': { $gte: monthStart } }] }),
-    Order.find(scope).populate('customer', 'name phone').sort({ createdAt: -1 }).limit(6),
+    Order.find(scope).populate('customer', 'name phone').sort(req.query.recentOrdersSort === 'recent' ? { createdAt: -1 } : { dueDate: 1, createdAt: -1 }).limit(6),
     Order.find({ ...scope, $and: [{ stage: 'design' }, { status: { $in: ['Awaiting approval', 'Changes requested', 'Design in progress'] } }] })
       .populate('customer', 'name phone').sort({ dueDate: 1 }).limit(5),
     Order.find({ ...notDelivered, dueDate: { $lt: soon } }).populate('customer', 'name phone').sort({ dueDate: 1 }).limit(6),

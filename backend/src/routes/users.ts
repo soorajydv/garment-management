@@ -5,7 +5,7 @@ import { User } from '../models/user.model';
 import { Customer } from '../models/Customer';
 import { currentUser, requirePermission } from '../middleware/auth';
 import { roleExists } from '../lib/roles';
-import { assertObjectId, badRequest, notFound, parse } from '../lib/http';
+import { assertObjectId, badRequest, escapeRegex, notFound, pagination, parse } from '../lib/http';
 import { audit } from '../lib/audit';
 
 const router = Router();
@@ -33,9 +33,20 @@ async function checkCustomerLink(role: string, customer: string | null | undefin
   return customer;
 }
 
-router.get('/', async (_req, res) => {
-  const users = await User.find().populate('customer', 'name').sort({ role: 1, name: 1 }).lean();
-  res.json({ users: users.map(toDto) });
+router.get('/', async (req, res) => {
+  const { page, limit, skip } = pagination(req.query as Record<string, unknown>, 50);
+  const query = req.query as Record<string, string | undefined>;
+  const filter: Record<string, unknown> = {};
+  if (query.role) filter.role = query.role;
+  if (query.search?.trim()) {
+    const rx = { $regex: escapeRegex(query.search.trim()), $options: 'i' };
+    filter.$or = [{ name: rx }, { email: rx }, { phone: rx }];
+  }
+  const [users, total] = await Promise.all([
+    User.find(filter).populate('customer', 'name').sort({ role: 1, name: 1 }).skip(skip).limit(limit).lean(),
+    User.countDocuments(filter),
+  ]);
+  res.json({ users: users.map(toDto), total, page, limit });
 });
 
 const createSchema = z.object({

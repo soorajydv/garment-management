@@ -8,7 +8,7 @@ import {
 } from '../lib/constants';
 import { listRoles, permissionsForUserRole } from '../lib/roles';
 import { INVENTORY_CATEGORIES } from '../models/Inventory';
-import { pagination, parse } from '../lib/http';
+import { escapeRegex, pagination, parse } from '../lib/http';
 import { audit } from '../lib/audit';
 
 export const settingsRouter = Router();
@@ -24,6 +24,7 @@ const dto = (s: Record<string, any>) => ({
   orderPrefix: s.orderPrefix,
   invoicePrefix: s.invoicePrefix,
   dueSoonDays: s.dueSoonDays,
+  auditRetentionDays: s.auditRetentionDays,
   invoiceFooter: s.invoiceFooter,
 });
 
@@ -45,6 +46,7 @@ settingsRouter.put('/', requirePermission('settings.manage'), async (req, res) =
       orderPrefix: prefix,
       invoicePrefix: prefix,
       dueSoonDays: z.coerce.number().int().min(1).max(30),
+      auditRetentionDays: z.coerce.number().int().min(1).max(3650).optional(),
       invoiceFooter: z.string().trim().max(500).default(''),
     }),
     req.body,
@@ -53,6 +55,14 @@ settingsRouter.put('/', requirePermission('settings.manage'), async (req, res) =
   const saved = await Settings.findByIdAndUpdate('global', body, { returnDocument: 'after' }).lean();
   await audit(user, 'settings.updated', 'Settings', 'global', 'Updated business settings');
   res.json({ settings: dto(saved!) });
+});
+
+settingsRouter.patch('/audit-retention', requirePermission('settings.manage'), async (req, res) => {
+  const user = currentUser(req);
+  const body = parse(z.object({ auditRetentionDays: z.coerce.number().int().min(1).max(3650) }), req.body);
+  const saved = await Settings.findByIdAndUpdate('global', body, { returnDocument: 'after' }).lean();
+  await audit(user, 'settings.audit_retention.updated', 'Settings', 'global', `Set audit-log retention to ${body.auditRetentionDays} days`);
+  res.json({ auditRetentionDays: saved?.auditRetentionDays });
 });
 
 /** Static option lists so the frontend never hard-codes business vocabulary. */
@@ -77,14 +87,29 @@ metaRouter.get('/', async (req, res) => {
 export const auditRouter = Router();
 auditRouter.get('/', requirePermission('audit.view'), async (req, res) => {
   const { limit, skip, page } = pagination(req.query as Record<string, unknown>, 50);
+  const query = req.query as Record<string, string | undefined>;
+  const filter: Record<string, unknown> = {};
+  if (query.action?.trim()) filter.action = query.action.trim();
+  if (query.search?.trim()) {
+    const rx = { $regex: escapeRegex(query.search.trim()), $options: 'i' };
+    filter.$or = [
+      { actorName: rx },
+      { actorRole: rx },
+      { action: rx },
+      { entity: rx },
+      { entityId: rx },
+      { summary: rx },
+    ];
+  }
   const [logs, total] = await Promise.all([
-    AuditLog.find().sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-    AuditLog.countDocuments(),
+    AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    AuditLog.countDocuments(filter),
   ]);
   res.json({
     logs: logs.map((l) => ({ id: String(l._id), actorName: l.actorName, actorRole: l.actorRole, action: l.action, entity: l.entity, entityId: l.entityId, summary: l.summary, at: l.createdAt })),
     total,
     page,
     limit,
+    actions: await AuditLog.distinct('action'),
   });
 });

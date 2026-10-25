@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, useApi } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -16,7 +16,14 @@ function statusLabel(record: AttendanceRecord) {
 
 export default function AttendancePage() {
   const { user, meta } = useAuth();
-  const { data, error, reload } = useApi<{ attendance: AttendanceRecord[] }>('/attendance');
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [search, status]);
+  const attendanceParams = new URLSearchParams({ page: String(page), limit: meta.permissions.includes('attendance.approve') ? '50' : '30' });
+  if (search.trim()) attendanceParams.set('search', search.trim());
+  if (status) attendanceParams.set('status', status);
+  const { data, error, reload } = useApi<{ attendance: AttendanceRecord[]; total: number; page: number; limit: number }>(`/attendance?${attendanceParams}`);
   const [busy, setBusy] = useState(false);
   const [rejecting, setRejecting] = useState<AttendanceRecord | null>(null);
   const toast = useToast();
@@ -49,6 +56,15 @@ export default function AttendancePage() {
         ) : canCheckIn ? <button className="btn primary" disabled={busy} onClick={() => action('/attendance/check-in', 'Check-in request sent for approval')}>Check in</button> : <Badge>Check-in unavailable</Badge>}
       />
       {error && <Notice tone="error">{error}</Notice>}
+      <div className="toolbar">
+        {isOwner && <div className="search"><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee…" aria-label="Search attendance" /></div>}
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter attendance status">
+          <option value="">All statuses</option>
+          <option value="pending">Pending approval</option>
+          <option value="approved">Checked in</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
       {!data ? <Spinner /> : (
         <section className="card flush">
           <div className="table-wrap">
@@ -71,6 +87,11 @@ export default function AttendancePage() {
           </div>
         </section>
       )}
+      {data && data.total > data.limit && <div className="toolbar" style={{ marginTop: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <button className="btn small" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>
+        <span className="small muted">Page {page} of {Math.ceil(data.total / data.limit)}</span>
+        <button className="btn small" disabled={page >= Math.ceil(data.total / data.limit)} onClick={() => setPage(page + 1)}>Next →</button>
+      </div>}
       {rejecting && <RejectModal record={rejecting} onClose={() => setRejecting(null)} onSaved={() => { setRejecting(null); reload(); }} />}
     </>
   );

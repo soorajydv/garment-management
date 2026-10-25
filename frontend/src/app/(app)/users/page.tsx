@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, useApi } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
@@ -21,7 +21,16 @@ const ROLE_SCOPE: Record<Role, string> = {
 export default function UsersPage() {
   const { user: me, meta } = useAuth();
   const toast = useToast();
-  const { data, error, reload } = useApi<{ users: UserRow[] }>('/users');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [role, setRole] = useState('');
+  const [page, setPage] = useState(1);
+  useEffect(() => { const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300); return () => clearTimeout(timer); }, [search]);
+  useEffect(() => setPage(1), [debouncedSearch, role]);
+  const userParams = new URLSearchParams({ page: String(page), limit: '50' });
+  if (debouncedSearch) userParams.set('search', debouncedSearch);
+  if (role) userParams.set('role', role);
+  const { data, error, reload } = useApi<{ users: UserRow[]; total: number; limit: number }>(`/users?${userParams}`);
   const [editing, setEditing] = useState<UserRow | 'new' | null>(null);
   const [resetting, setResetting] = useState<UserRow | null>(null);
 
@@ -47,6 +56,13 @@ export default function UsersPage() {
         actions={<button className="btn primary" onClick={() => setEditing('new')}>＋ Add user</button>}
       />
       {error && <Notice tone="error">{error}</Notice>}
+      <div className="toolbar">
+        <div className="search"><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, email or phone…" aria-label="Search users" /></div>
+        <select value={role} onChange={(e) => setRole(e.target.value)} aria-label="Filter users by role">
+          <option value="">All roles</option>
+          {meta.roles.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
+        </select>
+      </div>
       <div className="card flush">
         {!data ? <Spinner /> : (
           <div className="table-wrap">
@@ -72,6 +88,11 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+      {data && data.total > data.limit && <div className="toolbar" style={{ marginTop: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <button className="btn small" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>
+        <span className="small muted">Page {page} of {Math.ceil(data.total / data.limit)}</span>
+        <button className="btn small" disabled={page >= Math.ceil(data.total / data.limit)} onClick={() => setPage(page + 1)}>Next →</button>
+      </div>}
       <div className="two-col" style={{ marginTop: 15 }}>
         <div className="card">
           <h2>Security baseline</h2>

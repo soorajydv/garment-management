@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import type { Order } from '@/lib/types';
-import { dueLabel, fmtMoney } from '@/lib/format';
+import { daysUntil, dueLabel, fmtMoney } from '@/lib/format';
 import { Icon, type IconName } from './Icon';
 
 const STAT_ICONS: Record<string, IconName> = {
@@ -97,7 +97,17 @@ export function DueDate({ order }: { order: Pick<Order, 'dueDate' | 'stage'> }) 
   return <span className={d.tone}>{d.text}</span>;
 }
 
-export function OrderTable({ orders, showMoney, compact }: { orders: Order[]; showMoney: boolean; compact?: boolean }) {
+function remainingText(order: Pick<Order, 'dueDate' | 'stage'>) {
+  if (order.stage === 'delivered') return 'Delivered';
+  const days = daysUntil(order.dueDate);
+  if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`;
+  if (days === 0) return 'Due today';
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} left`;
+  const months = Math.max(1, Math.floor(days / 30));
+  return `${months} month${months === 1 ? '' : 's'} left`;
+}
+
+export function OrderTable({ orders, showMoney, compact, showRemaining = false }: { orders: Order[]; showMoney: boolean; compact?: boolean; showRemaining?: boolean }) {
   if (!orders.length) return <Empty>No orders match this view.</Empty>;
   return (
     <div className="table-wrap">
@@ -125,7 +135,7 @@ export function OrderTable({ orders, showMoney, compact }: { orders: Order[]; sh
               <td className="num">{o.quantity}</td>
               <td>{o.stageLabel}</td>
               <td><Badge>{o.status}</Badge></td>
-              <td><DueDate order={o} /></td>
+              <td><DueDate order={o} />{showRemaining && <span className="deadline-remaining">{remainingText(o)}</span>}</td>
               {showMoney && !compact && <td className="num">{o.totalAmount ? fmtMoney(o.totalAmount) : <span className="muted">To quote</span>}</td>}
               {showMoney && !compact && <td className="num">{fmtMoney(o.balance)}</td>}
             </tr>

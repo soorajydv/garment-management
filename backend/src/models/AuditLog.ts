@@ -9,6 +9,8 @@ const auditSchema = new Schema(
     entity: { type: String, required: true },
     entityId: { type: String, default: '' },
     summary: { type: String, default: '' },
+    // MongoDB's TTL monitor removes the record once this timestamp is reached.
+    expiresAt: { type: Date, required: true, expires: 0 },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
 );

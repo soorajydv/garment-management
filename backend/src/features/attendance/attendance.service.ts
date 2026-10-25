@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { audit } from '../../lib/audit';
-import { badRequest, conflict, notFound } from '../../lib/http';
+import { badRequest, conflict, escapeRegex, notFound, pagination } from '../../lib/http';
 import { User } from '../../models/user.model';
 import type { AuthUser } from '../../middleware/auth';
 import { Attendance, type AttendanceStatus } from './attendance.model';
@@ -26,16 +26,22 @@ function toDto(record: Record<string, any>) {
   };
 }
 
-export async function listAttendance(user: AuthUser) {
+export async function listAttendance(user: AuthUser, query: Record<string, unknown>) {
   const canReviewAll = user.permissions.includes('attendance.approve');
-  const filter = canReviewAll ? {} : { user: user.id };
-  const records = await Attendance.find(filter)
-    .populate('user', 'name email role')
-    .populate('approvedBy', 'name')
-    .sort({ checkInAt: -1 })
-    .limit(canReviewAll ? 200 : 30)
-    .lean();
-  return records.map(toDto);
+  const { page, limit, skip } = pagination(query, canReviewAll ? 50 : 30);
+  const q = query as Record<string, string | undefined>;
+  const filter: Record<string, unknown> = canReviewAll ? {} : { user: user.id };
+  if (q.status && ['pending', 'approved', 'rejected'].includes(q.status)) filter.status = q.status;
+  if (q.search?.trim() && canReviewAll) {
+    const rx = { $regex: escapeRegex(q.search.trim()), $options: 'i' };
+    const users = await User.find({ $or: [{ name: rx }, { email: rx }] }).select('_id').limit(200).lean();
+    filter.user = { $in: users.map((item) => item._id) };
+  }
+  const [records, total] = await Promise.all([
+    Attendance.find(filter).populate('user', 'name email role').populate('approvedBy', 'name').sort({ checkInAt: -1 }).skip(skip).limit(limit).lean(),
+    Attendance.countDocuments(filter),
+  ]);
+  return { records: records.map(toDto), total, page, limit };
 }
 
 export async function checkIn(user: AuthUser) {

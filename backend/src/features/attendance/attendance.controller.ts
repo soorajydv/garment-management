@@ -5,7 +5,8 @@ import { approveCheckIn, checkIn, checkOut, listAttendance, rejectCheckIn } from
 import { rejectionSchema } from './attendance.validation';
 
 export async function listAttendanceController(req: Request, res: Response) {
-  res.json({ attendance: await listAttendance(currentUser(req)) });
+  const result = await listAttendance(currentUser(req), req.query as Record<string, unknown>);
+  res.json({ attendance: result.records, total: result.total, page: result.page, limit: result.limit });
 }
 
 export async function checkInController(req: Request, res: Response) {

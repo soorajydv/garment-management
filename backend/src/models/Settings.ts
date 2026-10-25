@@ -13,6 +13,7 @@ const settingsSchema = new Schema(
     orderPrefix: { type: String, default: 'SS' },
     invoicePrefix: { type: String, default: 'INV' },
     dueSoonDays: { type: Number, default: 3 },
+    auditRetentionDays: { type: Number, default: 365, min: 1, max: 3650 },
     invoiceFooter: { type: String, default: 'Thank you for your business.' },
   },
   { timestamps: true },

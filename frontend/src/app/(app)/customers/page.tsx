@@ -15,6 +15,7 @@ export default function CustomersPage() {
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Customer | 'new' | null>(null);
   const [viewing, setViewing] = useState<Customer | null>(null);
 
@@ -22,7 +23,10 @@ export default function CustomersPage() {
     const t = setTimeout(() => setDebounced(search), 300);
     return () => clearTimeout(t);
   }, [search]);
-  const { data, error, reload } = useApi<{ customers: Customer[] }>(`/customers${debounced ? `?search=${encodeURIComponent(debounced)}` : ''}`);
+  useEffect(() => setPage(1), [debounced]);
+  const customerParams = new URLSearchParams({ page: String(page), limit: '50' });
+  if (debounced) customerParams.set('search', debounced);
+  const { data, error, reload } = useApi<{ customers: Customer[]; total: number; limit: number }>(`/customers?${customerParams}`);
   const customers = data?.customers ?? [];
   const totals = customers.reduce((a, c) => ({ value: a.value + c.orderValue, outstanding: a.outstanding + c.outstanding, active: a.active + c.activeOrders }), { value: 0, outstanding: 0, active: 0 });
 
@@ -46,7 +50,7 @@ export default function CustomersPage() {
         actions={canManage && <button className="btn primary" onClick={() => setEditing('new')}>＋ Add customer</button>}
       />
       <div className="stats">
-        <StatCard label="Customers" value={customers.length} note={debounced ? 'Matching search' : 'In directory'} icon="♙" />
+        <StatCard label="Customers" value={data?.total ?? '—'} note={debounced ? 'Matching search' : 'In directory'} icon="♙" />
         <StatCard label="With active orders" value={customers.filter((c) => c.activeOrders).length} note={`${totals.active} orders in progress`} icon="▤" />
         <StatCard label="Lifetime order value" value={fmtMoney(totals.value)} icon="↗" />
         <StatCard label="Outstanding" value={fmtMoney(totals.outstanding)} icon="◷" tone={totals.outstanding ? 'amber' : 'green'} />
@@ -89,6 +93,11 @@ export default function CustomersPage() {
           </div>
         )}
       </div>
+      {data && data.total > data.limit && <div className="toolbar" style={{ marginTop: 12, justifyContent: 'flex-end', alignItems: 'center' }}>
+        <button className="btn small" disabled={page <= 1} onClick={() => setPage(page - 1)}>← Prev</button>
+        <span className="small muted">Page {page} of {Math.ceil(data.total / data.limit)}</span>
+        <button className="btn small" disabled={page >= Math.ceil(data.total / data.limit)} onClick={() => setPage(page + 1)}>Next →</button>
+      </div>}
       {editing && (
         <CustomerForm
           customer={editing === 'new' ? null : editing}
