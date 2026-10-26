@@ -7,6 +7,7 @@ import { badRequest, HttpError } from '../../lib/http';
 import { signToken } from '../../middleware/auth';
 import type { AuthUser } from '../../middleware/auth';
 import { permissionsForUserRole } from '../../lib/roles';
+import { removeStoredFile } from '../../lib/uploads';
 
 export async function login(email: string, password: string) {
   const user = await User.findOne({ email }).select('+passwordHash');
@@ -60,8 +61,33 @@ export async function getProfile(userId: string) {
     email: user.email,
     role: user.role,
     phone: user.phone,
+    avatarUrl: user.avatarStoredName ? '/api/auth/avatar' : '',
     customer: customer ? { id: String(customer._id), name: customer.name } : null,
   };
+}
+
+export async function updateAvatar(userId: string, actor: AuthUser, file: Express.Multer.File) {
+  const user = await User.findById(userId);
+  if (!user) throw new HttpError(404, 'Account not found');
+  const previous = user.avatarStoredName;
+  user.avatarStoredName = file.filename;
+  user.avatarMimeType = file.mimetype;
+  await user.save();
+  removeStoredFile(previous);
+  await audit(actor, 'user.avatar_updated', 'User', userId, `${actor.name} updated their profile avatar`);
+  return getProfile(userId);
+}
+
+export async function removeAvatar(userId: string, actor: AuthUser) {
+  const user = await User.findById(userId);
+  if (!user) throw new HttpError(404, 'Account not found');
+  const previous = user.avatarStoredName;
+  user.avatarStoredName = null;
+  user.avatarMimeType = null;
+  await user.save();
+  removeStoredFile(previous);
+  await audit(actor, 'user.avatar_removed', 'User', userId, `${actor.name} removed their profile avatar`);
+  return getProfile(userId);
 }
 
 export async function changePassword(

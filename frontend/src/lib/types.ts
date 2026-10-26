@@ -20,6 +20,7 @@ export interface Me {
   email: string;
   role: Role;
   phone: string;
+  avatarUrl: string;
   customer: { id: string; name: string } | null;
 }
 
@@ -39,6 +40,7 @@ export interface Meta {
 
 export interface Settings {
   businessName: string;
+  logoUrl: string;
   address: string;
   phone: string;
   email: string;

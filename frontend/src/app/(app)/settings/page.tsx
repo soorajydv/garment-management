@@ -13,7 +13,40 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ ...settings, dueSoonDays: String(settings.dueSoonDays) });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoError, setLogoError] = useState('');
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value });
+
+  async function uploadLogo(file: File | undefined) {
+    if (!file) return;
+    setLogoBusy(true);
+    setLogoError('');
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      await api('/settings/business-logo', { method: 'PATCH', form: formData });
+      await refreshSettings();
+      toast('Business logo updated');
+    } catch (err) {
+      setLogoError(errorMessage(err));
+    } finally {
+      setLogoBusy(false);
+    }
+  }
+
+  async function removeLogo() {
+    setLogoBusy(true);
+    setLogoError('');
+    try {
+      await api('/settings/business-logo', { method: 'DELETE' });
+      await refreshSettings();
+      toast('Business logo removed');
+    } catch (err) {
+      setLogoError(errorMessage(err));
+    } finally {
+      setLogoBusy(false);
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -43,6 +76,10 @@ export default function SettingsPage() {
         <form onSubmit={save} style={{ maxWidth: 900, display: 'grid', gap: 16 }}>
           <section className="card">
             {error && <Notice tone="error" style={{ marginBottom: 14 }}>{error}</Notice>}
+            <div className="profile-avatar-editor" style={{ marginBottom: 20 }}>
+              <div className="profile-avatar-preview business-logo-preview">{settings.logoUrl ? <img src={settings.logoUrl} alt="Business logo" /> : 'S&S'}</div>
+              <div><strong>Business logo</strong><div className="card-sub">Shown in the sidebar and business documents. PNG, JPG, WEBP or GIF · up to 5 MB</div><div className="form-actions" style={{ marginTop: 8 }}><label className="btn small" style={{ cursor: logoBusy ? 'wait' : 'pointer' }}>{logoBusy ? 'Uploading…' : 'Choose image'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden disabled={logoBusy} onChange={(e) => { void uploadLogo(e.target.files?.[0]); e.currentTarget.value = ''; }} /></label>{settings.logoUrl && <button type="button" className="btn small" onClick={removeLogo} disabled={logoBusy}>Remove</button>}</div>{logoError && <div className="error-text">{logoError}</div>}</div>
+            </div>
             <div className="form-grid">
               <Field label="Registered business name *" full><input required value={form.businessName} onChange={set('businessName')} /></Field>
               <Field label="Address" full><input value={form.address} onChange={set('address')} /></Field>

@@ -1,9 +1,11 @@
 import type { Request, Response } from 'express';
 import { env } from '../../config/env';
 import { AUTH_COOKIE, currentUser } from '../../middleware/auth';
-import { parse } from '../../lib/http';
+import { badRequest, parse } from '../../lib/http';
+import { storedFilePath } from '../../lib/uploads';
+import { User } from '../../models/user.model';
 import { changePasswordSchema, deleteAccountSchema, forgotPasswordSchema, loginSchema, profileSchema, resetPasswordSchema } from './auth.validation';
-import { changePassword, deleteAccount, getProfile, login, requestPasswordReset, resetPassword, updateProfile } from './auth.service';
+import { changePassword, deleteAccount, getProfile, login, removeAvatar, requestPasswordReset, resetPassword, updateAvatar, updateProfile } from './auth.service';
 
 const cookieOptions = {
   httpOnly: true,
@@ -42,6 +44,24 @@ export function logoutController(_req: Request, res: Response) {
 
 export async function meController(req: Request, res: Response) {
   res.json({ user: await getProfile(currentUser(req).id) });
+}
+
+export async function uploadAvatarController(req: Request, res: Response) {
+  const me = currentUser(req);
+  if (!req.file) throw badRequest('avatar: Select an image to upload');
+  res.json({ user: await updateAvatar(me.id, me, req.file) });
+}
+
+export async function deleteAvatarController(req: Request, res: Response) {
+  const me = currentUser(req);
+  res.json({ user: await removeAvatar(me.id, me) });
+}
+
+export async function avatarController(req: Request, res: Response) {
+  const me = currentUser(req);
+  const user = await User.findById(me.id).select('+avatarStoredName avatarMimeType').lean();
+  if (!user?.avatarStoredName) { res.status(404).end(); return; }
+  res.type(user.avatarMimeType ?? 'application/octet-stream').sendFile(storedFilePath(user.avatarStoredName), (err) => { if (err && !res.headersSent) res.status(404).end(); });
 }
 
 export async function changePasswordController(req: Request, res: Response) {

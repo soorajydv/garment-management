@@ -9,6 +9,7 @@ import type { Permission } from '@/lib/types';
 import { api } from '@/lib/api';
 import { useTheme } from './ThemeProvider';
 import { Icon, type IconName } from './Icon';
+import { PwaInstallButton } from './PwaInstallButton';
 
 type NavItem = { href: string; label: string; icon: IconName; permission?: Permission };
 type NotificationItem = { id: string; type?: string; title: string; body: string; href: string; read: boolean };
@@ -137,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className={`layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className={`sidebar ${open ? 'open' : ''}`}>
         <div className="brand">
-          <div className="brand-mark">S&amp;S</div>
+          {settings.logoUrl ? <img className="brand-logo" src={settings.logoUrl} alt="Business logo" /> : <div className="brand-mark">S&amp;S</div>}
           <div className="brand-copy">
             <div className="brand-name">{settings.businessName.replace(/ PVT LTD$/i, '')}</div>
             <div className="brand-sub">{user.role === 'customer' ? 'CUSTOMER PORTAL' : 'FACTORY MANAGEMENT'}</div>
@@ -174,6 +175,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div className="top-actions">
+            <PwaInstallButton />
             <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} /></button>
             <div className="notification-wrap" ref={notificationRef}>
               <button className="icon-btn" onClick={() => setNotificationsOpen((value) => !value)} aria-label="Open notifications" aria-expanded={notificationsOpen}><Icon name="bell" size={17} />{unreadCount > 0 && <span className="notification-dot">{unreadCount > 9 ? '9+' : unreadCount}</span>}</button>
@@ -187,7 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {user.name}
                 <small>{roleLabel(user.role, meta.roles)}</small>
               </div>
-              <Link className="avatar" href="/profile" aria-label="Open my profile" title="My profile">{initials(user.name)}</Link>
+              <Link className="avatar" href="/profile" aria-label="Open my profile" title="My profile">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials(user.name)}</Link>
             </div>
           </div>
         </header>

@@ -7,22 +7,37 @@ import { badRequest } from './http';
 
 export const ALLOWED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.pdf', '.ai', '.eps', '.svg', '.psd', '.cdr'];
 const INLINE_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'];
+const AVATAR_MIME = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 
 fs.mkdirSync(env.uploadDir, { recursive: true });
 
+const storage = multer.diskStorage({
+  destination: env.uploadDir,
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${crypto.randomUUID()}${ext}`);
+  },
+});
+
 export const upload = multer({
-  storage: multer.diskStorage({
-    destination: env.uploadDir,
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${crypto.randomUUID()}${ext}`);
-    },
-  }),
+  storage,
   limits: { fileSize: env.maxUploadBytes, files: 12 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       cb(badRequest(`File type ${ext || 'unknown'} is not allowed`));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+export const avatarUpload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!AVATAR_MIME.includes(file.mimetype)) {
+      cb(badRequest('Only PNG, JPG, JPEG, WEBP or GIF images are allowed'));
       return;
     }
     cb(null, true);
@@ -42,4 +57,8 @@ export function isInlineSafe(mimeType: string) {
 
 export function removeUploadedFiles(files: Express.Multer.File[] | undefined) {
   for (const f of files ?? []) fs.promises.unlink(f.path).catch(() => undefined);
+}
+
+export function removeStoredFile(storedName: string | null | undefined) {
+  if (storedName) fs.promises.unlink(storedFilePath(storedName)).catch(() => undefined);
 }

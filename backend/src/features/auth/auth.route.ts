@@ -1,14 +1,18 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from '../../middleware/auth';
+import { avatarUpload } from '../../lib/uploads';
 import {
+  avatarController,
   changePasswordController,
+  deleteAvatarController,
   deleteAccountController,
   forgotPasswordController,
   loginController,
   logoutController,
   meController,
   resetPasswordController,
+  uploadAvatarController,
   updateProfileController,
 } from './auth.controller';
 
@@ -35,7 +39,10 @@ router.post('/forgot-password', passwordResetLimiter, forgotPasswordController);
 router.post('/reset-password', passwordResetLimiter, resetPasswordController);
 router.post('/logout', logoutController);
 router.get('/me', requireAuth, meController);
+router.get('/avatar', requireAuth, avatarController);
 router.patch('/profile', requireAuth, updateProfileController);
+router.patch('/avatar', requireAuth, avatarUpload.single('avatar'), uploadAvatarController);
+router.delete('/avatar', requireAuth, deleteAvatarController);
 router.delete('/account', requireAuth, deleteAccountController);
 router.post('/change-password', requireAuth, changePasswordController);
 

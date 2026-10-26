@@ -2,7 +2,7 @@ import type { SVGProps } from 'react';
 
 export type IconName =
   | 'activity' | 'alert' | 'arrowUp' | 'attendance' | 'bell' | 'box' | 'chart' | 'check' | 'chevronLeft' | 'chevronRight' | 'close' | 'customers' | 'dashboard'
-  | 'delivery' | 'inventory' | 'menu' | 'moon' | 'orders' | 'production' | 'receipt'
+  | 'delivery' | 'download' | 'inventory' | 'menu' | 'moon' | 'orders' | 'production' | 'receipt'
   | 'profile' | 'roles' | 'settings' | 'sidebar' | 'sun' | 'users' | 'logout';
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -20,6 +20,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   customers: <><path d="M16 20v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1" /><circle cx="9.5" cy="7" r="3" /><path d="M17 11a3 3 0 1 0-1-5.8M21 20v-1a4 4 0 0 0-3-3.9" /></>,
   dashboard: <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>,
   delivery: <><path d="M3 6h11v11H3zM14 10h4l3 3v4h-7z" /><circle cx="7" cy="19" r="2" /><circle cx="17" cy="19" r="2" /></>,
+  download: <><path d="M12 3v12M7 10l5 5 5-5M4 21h16" /></>,
   inventory: <><path d="m4 7 8-4 8 4-8 4-8-4ZM4 12l8 4 8-4M4 17l8 4 8-4" /></>,
   logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M21 3v18" /></>,
   menu: <><path d="M4 6h16M4 12h16M4 18h16" /></>,

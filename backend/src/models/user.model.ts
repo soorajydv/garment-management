@@ -13,6 +13,8 @@ const userSchema = new Schema(
     lastLoginAt: { type: Date, default: null },
     passwordResetTokenHash: { type: String, default: null, select: false },
     passwordResetExpiresAt: { type: Date, default: null, select: false },
+    avatarStoredName: { type: String, default: null },
+    avatarMimeType: { type: String, default: null },
   },
   { timestamps: true },
 );

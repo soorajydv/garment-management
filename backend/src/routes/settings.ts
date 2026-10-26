@@ -8,13 +8,15 @@ import {
 } from '../lib/constants';
 import { listRoles, permissionsForUserRole } from '../lib/roles';
 import { INVENTORY_CATEGORIES } from '../models/Inventory';
-import { escapeRegex, pagination, parse } from '../lib/http';
+import { badRequest, escapeRegex, pagination, parse } from '../lib/http';
 import { audit } from '../lib/audit';
+import { avatarUpload, removeStoredFile, storedFilePath } from '../lib/uploads';
 
 export const settingsRouter = Router();
 
 const dto = (s: Record<string, any>) => ({
   businessName: s.businessName,
+  logoUrl: s.logoStoredName ? '/api/settings/logo' : '',
   address: s.address,
   phone: s.phone,
   email: s.email,
@@ -63,6 +65,37 @@ settingsRouter.patch('/audit-retention', requirePermission('settings.manage'), a
   const saved = await Settings.findByIdAndUpdate('global', body, { returnDocument: 'after' }).lean();
   await audit(user, 'settings.audit_retention.updated', 'Settings', 'global', `Set audit-log retention to ${body.auditRetentionDays} days`);
   res.json({ auditRetentionDays: saved?.auditRetentionDays });
+});
+
+settingsRouter.get('/logo', requirePermission('settings.view'), async (_req, res) => {
+  const settings = await getSettings();
+  if (!settings.logoStoredName) { res.status(404).end(); return; }
+  res.type(settings.logoMimeType ?? 'application/octet-stream').sendFile(storedFilePath(settings.logoStoredName), (err) => { if (err && !res.headersSent) res.status(404).end(); });
+});
+
+settingsRouter.patch('/business-logo', requirePermission('settings.manage'), avatarUpload.single('logo'), async (req, res) => {
+  const user = currentUser(req);
+  if (!req.file) throw badRequest('logo: Select an image to upload');
+  const settings = await getSettings();
+  const previous = settings.logoStoredName;
+  settings.logoStoredName = req.file.filename;
+  settings.logoMimeType = req.file.mimetype;
+  await settings.save();
+  removeStoredFile(previous);
+  await audit(user, 'settings.business_logo_updated', 'Settings', 'global', 'Updated the business profile logo');
+  res.json({ settings: dto(settings.toObject()) });
+});
+
+settingsRouter.delete('/business-logo', requirePermission('settings.manage'), async (req, res) => {
+  const user = currentUser(req);
+  const settings = await getSettings();
+  const previous = settings.logoStoredName;
+  settings.logoStoredName = null;
+  settings.logoMimeType = null;
+  await settings.save();
+  removeStoredFile(previous);
+  await audit(user, 'settings.business_logo_removed', 'Settings', 'global', 'Removed the business profile logo');
+  res.json({ settings: dto(settings.toObject()) });
 });
 
 /** Static option lists so the frontend never hard-codes business vocabulary. */

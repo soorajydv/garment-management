@@ -4,6 +4,8 @@ const settingsSchema = new Schema(
   {
     _id: { type: String, default: 'global' },
     businessName: { type: String, default: 'S & S TEXTILES PVT LTD' },
+    logoStoredName: { type: String, default: null },
+    logoMimeType: { type: String, default: null },
     address: { type: String, default: '' },
     phone: { type: String, default: '' },
     email: { type: String, default: '' },
