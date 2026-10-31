@@ -17,9 +17,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = window.localStorage.getItem('ss-theme');
-    const next: Theme = stored === 'dark' || stored === 'light'
-      ? stored
-      : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const next: Theme = stored === 'dark' || stored === 'light' ? stored : 'light';
     setTheme(next);
     setDocumentTheme(next);
   }, []);

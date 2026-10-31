@@ -61,6 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace('/login');
   }, [router]);
 
-  if (!state) return <div className="spinner" aria-label="Loading" />;
+  if (!state) return <div className="loading-screen"><div className="spinner" aria-label="Loading" /></div>;
   return <AuthContext.Provider value={{ ...state, refreshSettings, refreshUser, logout }}>{children}</AuthContext.Provider>;
 }

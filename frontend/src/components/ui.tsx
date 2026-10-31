@@ -56,8 +56,8 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>;
 }
 
-export function Spinner() {
-  return <div className="spinner" aria-label="Loading" />;
+export function Spinner({ fullPage = false }: { fullPage?: boolean }) {
+  return <div className={fullPage ? 'loading-screen' : 'loading-panel'}><div className="spinner" aria-label="Loading" /></div>;
 }
 
 export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
