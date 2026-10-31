@@ -70,9 +70,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsBusy, setNotificationsBusy] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const { theme, toggleTheme } = useTheme();
   const section = pathname.split('/')[1] || 'dashboard';
 
@@ -98,6 +100,22 @@ export function AppShell({ children }: { children: ReactNode }) {
       document.removeEventListener('keydown', closeOnEscape);
     };
   }, [notificationsOpen]);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) setUserMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setUserMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [userMenuOpen]);
 
   useEffect(() => {
     let active = true;
@@ -160,7 +178,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="side-bottom">
           <div className="side-user-copy"><strong>{user.customer?.name ?? roleLabel(user.role, meta.roles)}</strong>
           Signed in as {user.email}</div>
-          <button className="btn small block side-signout" style={{ marginTop: 10, background: 'transparent', color: '#fff', borderColor: '#ffffff40' }} onClick={logout} title="Sign out">
+          <button className="btn small block side-signout" onClick={logout} title="Sign out">
             <Icon name="logout" size={14} /><span className="side-signout-label">Sign out</span>
           </button>
         </div>
@@ -184,12 +202,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {notifications.length ? <div className="notification-list">{notifications.map((notification) => <Link key={notification.id} href={notification.href} className={`notification-item ${notification.read ? 'read' : ''}`} onClick={async (event) => { event.preventDefault(); await markNotificationRead(notification.id); setNotificationsOpen(false); router.push(notification.href); }}><span className="notification-icon"><Icon name={notificationIcon(notification.type)} size={15} /></span><span className="notification-copy"><strong>{notification.title}</strong><span>{notification.body}</span></span>{!notification.read && <span className="notification-unread" aria-label="Unread notification" />}</Link>)}</div> : <div className="empty">No new notifications.</div>}
               </div>}
             </div>
-            <div className="user-chip">
+            <div className="user-chip" ref={userMenuRef}>
               <div className="who">
                 {user.name}
                 <small>{roleLabel(user.role, meta.roles)}</small>
               </div>
-              <Link className="avatar" href="/profile" aria-label="Open my profile" title="My profile">{user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials(user.name)}</Link>
+              <button className="avatar" type="button" onClick={() => setUserMenuOpen((value) => !value)} aria-label="Open account menu" aria-expanded={userMenuOpen} title="Account menu">
+                {user.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials(user.name)}
+              </button>
+              {userMenuOpen && (
+                <div className="user-menu" role="menu">
+                  <Link className="user-menu-link" href="/profile" role="menuitem" onClick={() => setUserMenuOpen(false)}>
+                    <Icon name="profile" size={15} /> My profile
+                  </Link>
+                  <button className="user-menu-logout" type="button" role="menuitem" onClick={async () => { setUserMenuOpen(false); await logout(); }}>
+                    <Icon name="logout" size={15} /> Log out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

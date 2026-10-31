@@ -36,7 +36,7 @@ export async function requestPasswordReset(email: string) {
   user.passwordResetExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
   await user.save();
   await audit(null, 'auth.password_reset_requested', 'User', String(user._id), `Password reset requested for ${user.email}`);
-  return { token, expiresAt: user.passwordResetExpiresAt };
+  return { token, expiresAt: user.passwordResetExpiresAt, name: user.name };
 }
 
 export async function resetPassword(token: string, newPassword: string) {

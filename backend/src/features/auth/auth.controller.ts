@@ -1,11 +1,12 @@
 import type { Request, Response } from 'express';
 import { env } from '../../config/env';
 import { AUTH_COOKIE, currentUser } from '../../middleware/auth';
-import { badRequest, parse } from '../../lib/http';
+import { badRequest, HttpError, parse } from '../../lib/http';
 import { storedFilePath } from '../../lib/uploads';
 import { User } from '../../models/user.model';
 import { changePasswordSchema, deleteAccountSchema, forgotPasswordSchema, loginSchema, profileSchema, resetPasswordSchema } from './auth.validation';
 import { changePassword, deleteAccount, getProfile, login, removeAvatar, requestPasswordReset, resetPassword, updateAvatar, updateProfile } from './auth.service';
+import { sendPasswordResetEmail } from '../../lib/mail';
 
 const cookieOptions = {
   httpOnly: true,
@@ -26,8 +27,16 @@ export async function forgotPasswordController(req: Request, res: Response) {
   const { email } = parse(forgotPasswordSchema, req.body);
   const result = await requestPasswordReset(email);
   const response: { message: string; resetUrl?: string } = { message: 'If an account exists for that email, password-reset instructions have been prepared.' };
-  if (result && !env.isProd) response.resetUrl = `${env.corsOrigins[0]}/reset-password?token=${result.token}`;
-  if (result) console.info(`Password reset link for ${email}: ${env.corsOrigins[0]}/reset-password?token=${result.token}`);
+  if (result) {
+    try {
+      await sendPasswordResetEmail(email, result.name, result.token);
+      if (!env.isProd) response.resetUrl = `${env.appUrl}/reset-password?token=${encodeURIComponent(result.token)}`;
+    } catch (error) {
+      console.error('Password reset email failed', error);
+      if (env.isProd) throw new HttpError(503, 'Password reset email could not be sent. Please try again later.');
+      response.resetUrl = `${env.appUrl}/reset-password?token=${encodeURIComponent(result.token)}`;
+    }
+  }
   res.json(response);
 }
 
