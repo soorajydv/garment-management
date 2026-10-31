@@ -6,8 +6,10 @@ import { ApiError, api, useApi } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
 import { Field, Notice, PageHeader } from '@/components/ui';
+import { LocalFilePreview } from '@/components/LocalFilePreview';
 import { fmtMoney, toInputDate } from '@/lib/format';
 import type { Customer, Order, Player } from '@/lib/types';
+import { DESIGN_EXTENSIONS, JERSEY_EXTENSIONS, MAX_UPLOAD_BYTES, validateUploadFile } from '@/lib/uploads';
 
 const NEW_CUSTOMER = '__new__';
 const MAX_ROWS_RENDERED = 300;
@@ -44,6 +46,7 @@ export default function NewOrderPage() {
   const [defaultSleeve, setDefaultSleeve] = useState('Half sleeve');
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
   const cfg = productConfig.toLowerCase();
@@ -87,10 +90,31 @@ export default function NewOrderPage() {
     toast(`Pasted ${Math.min(lines.length, next.length - start)} player rows`);
   }
 
+  function selectJerseyImage(file: File | undefined) {
+    if (!file) { setJerseyImage(null); return; }
+    const message = validateUploadFile(file, { extensions: JERSEY_EXTENSIONS, label: 'Jersey image' });
+    setUploadErrors((current) => ({ ...current, jerseyImage: message }));
+    setJerseyImage(message ? null : file);
+    if (message) toast(message, 'error');
+  }
+
+  function selectReferenceFiles(selected: File[]) {
+    const limited = selected.slice(0, 10);
+    const invalid = limited.find((file) => validateUploadFile(file, { extensions: DESIGN_EXTENSIONS, label: 'Reference file' }));
+    const message = invalid ? validateUploadFile(invalid, { extensions: DESIGN_EXTENSIONS, label: `Reference file ${invalid.name}` }) : selected.length > 10 ? 'You can upload a maximum of 10 reference files.' : '';
+    setUploadErrors((current) => ({ ...current, files: message }));
+    setFiles(message ? limited.filter((file) => !validateUploadFile(file, { extensions: DESIGN_EXTENSIONS })) : limited);
+    if (message) toast(message, 'error');
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setFieldErrors({});
+    if (Object.values(uploadErrors).some(Boolean)) {
+      toast('Please fix the upload errors before submitting.', 'error');
+      return;
+    }
     if (!isCustomer && !customerId) {
       setFieldErrors({ customerId: 'Select a customer' });
       return;
@@ -173,9 +197,14 @@ export default function NewOrderPage() {
               <input value={teamName} onChange={(e) => setTeamName(e.target.value)} />
             </Field>
             <Field label="Product configuration *" full error={fieldErrors.productConfig}>
-              <select value={productConfig} onChange={(e) => setProductConfig(e.target.value)}>
-                {meta.productConfigs.map((p) => <option key={p}>{p}</option>)}
-              </select>
+              <div className="checkbox-grid" role="group" aria-label="Product configuration">
+                {meta.productConfigs.map((p) => (
+                  <label className={`checkbox-card ${productConfig === p ? 'selected' : ''}`} key={p}>
+                    <input type="checkbox" checked={productConfig === p} onChange={() => setProductConfig(p)} />
+                    <span>{p}</span>
+                  </label>
+                ))}
+              </div>
             </Field>
             <Field label="Neck type *">
               <select value={neckType} onChange={(e) => setNeckType(e.target.value)}>
@@ -212,11 +241,13 @@ export default function NewOrderPage() {
         <section className="card">
           <h2 style={{ marginBottom: 16 }}>Design references</h2>
           <div className="form-grid">
-            <Field label="Jersey image" hint="A picture of the jersey design you want (PNG, JPG, PDF…)">
-              <input type="file" accept="image/*,.pdf" onChange={(e) => setJerseyImage(e.target.files?.[0] ?? null)} />
+            <Field label="Jersey image" hint={`PNG, JPG, WEBP, GIF or PDF · up to ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB`} error={uploadErrors.jerseyImage}>
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/gif,.pdf" onChange={(e) => { selectJerseyImage(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+              {jerseyImage && <LocalFilePreview file={jerseyImage} />}
             </Field>
-            <Field label="Logos / artwork files" hint="Up to 10 files: images, PDF, AI, EPS, SVG, PSD, CDR">
-              <input type="file" multiple accept="image/*,.pdf,.ai,.eps,.svg,.psd,.cdr" onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 10))} />
+            <Field label="Logos / artwork files" hint={`Up to 10 files · ${MAX_UPLOAD_BYTES / (1024 * 1024)} MB each`} error={uploadErrors.files}>
+              <input type="file" multiple accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.ai,.eps,.svg,.psd,.cdr" onChange={(e) => { selectReferenceFiles(Array.from(e.target.files ?? [])); e.currentTarget.value = ''; }} />
+              {files.map((file) => <LocalFilePreview key={`${file.name}-${file.lastModified}`} file={file} />)}
             </Field>
             <Field label="Comments / special instructions" full>
               <textarea rows={3} value={comments} onChange={(e) => setComments(e.target.value)} placeholder="Colour notes, sponsor placement, special requests…" />
@@ -229,7 +260,7 @@ export default function NewOrderPage() {
             <div>
               <h2>Player names, numbers & sizes</h2>
               <div className="card-sub">
-                One row per set. Leave rows blank if you&apos;ll send the list later. Tip: paste from a spreadsheet (Name ⇥ Number ⇥ Jersey size ⇥ {hasTrouser ? 'Trouser' : 'Shorts'} size) into the first name cell.
+                One row per set. Leave rows blank if you&apos;ll send the list later. Tip: paste from a spreadsheet (Name ⇥ Number ⇥ Jersey size{hasShorts ? ' ⇥ Shorts size' : ''}{hasTrouser ? ' ⇥ Trouser size' : ''}) into the first name cell.
               </div>
             </div>
             <select className="btn small" value={defaultSleeve} onChange={(e) => applySleeveToAll(e.target.value)} aria-label="Sleeve for all players">
@@ -240,7 +271,7 @@ export default function NewOrderPage() {
           <div className="table-wrap">
             <table className="player-table">
               <thead>
-                <tr><th>#</th><th>Player name</th><th>No.</th><th>Sleeve</th><th>Jersey</th><th>Shorts</th><th>Trouser</th></tr>
+                <tr><th>#</th><th>Player name</th><th>No.</th><th>Sleeve</th><th>Jersey</th>{hasShorts && <th>Shorts</th>}{hasTrouser && <th>Trouser</th>}</tr>
               </thead>
               <tbody>
                 {rows.map((p, i) => (
@@ -254,8 +285,8 @@ export default function NewOrderPage() {
                       </select>
                     </td>
                     <td>{sizeSelect(p.jerseySize, (v) => updatePlayer(i, { jerseySize: v }), false, `Player ${i + 1} jersey size`)}</td>
-                    <td>{sizeSelect(p.shortsSize, (v) => updatePlayer(i, { shortsSize: v }), !hasShorts, `Player ${i + 1} shorts size`)}</td>
-                    <td>{sizeSelect(p.trouserSize, (v) => updatePlayer(i, { trouserSize: v }), !hasTrouser, `Player ${i + 1} trouser size`)}</td>
+                    {hasShorts && <td>{sizeSelect(p.shortsSize, (v) => updatePlayer(i, { shortsSize: v }), false, `Player ${i + 1} shorts size`)}</td>}
+                    {hasTrouser && <td>{sizeSelect(p.trouserSize, (v) => updatePlayer(i, { trouserSize: v }), false, `Player ${i + 1} trouser size`)}</td>}
                   </tr>
                 ))}
               </tbody>

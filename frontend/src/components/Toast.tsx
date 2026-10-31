@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 type Toast = { id: number; message: string; tone: 'ok' | 'error' };
 const ToastContext = createContext<(message: string, tone?: 'ok' | 'error') => void>(() => undefined);
@@ -14,6 +14,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((t) => [...t, { id, message, tone }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), tone === 'error' ? 6000 : 3500);
   }, []);
+  useEffect(() => {
+    const onApiError = (event: Event) => {
+      const message = (event as CustomEvent<string>).detail;
+      if (message) push(message, 'error');
+    };
+    window.addEventListener('app-api-error', onApiError);
+    return () => window.removeEventListener('app-api-error', onApiError);
+  }, [push]);
   return (
     <ToastContext.Provider value={push}>
       {children}

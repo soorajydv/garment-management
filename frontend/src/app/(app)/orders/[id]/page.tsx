@@ -6,10 +6,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { api, useApi } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
+import { LocalFilePreview } from '@/components/LocalFilePreview';
 import { Badge, DueDate, Empty, Field, Modal, Notice, PageHeader, Spinner, errorMessage } from '@/components/ui';
 import { DeliverModal, EditOrderModal, RecordPaymentModal, TextPromptModal } from '@/components/OrderModals';
 import { STAGE_ORDER, STAGE_SHORT, canCompleteStage, canSeeMoney, fileSize, fmtDate, fmtDateTime, fmtMoney } from '@/lib/format';
 import type { Order, Payment, StoredFile } from '@/lib/types';
+import { DESIGN_EXTENSIONS, validateUploadFile } from '@/lib/uploads';
 
 type ModalKind = null | 'edit' | 'payment' | 'deliver' | 'advance' | 'sendBack' | 'feedback' | 'upload' | 'approve';
 
@@ -43,6 +45,8 @@ export default function OrderDetailPage() {
   const stageIdx = STAGE_ORDER.indexOf(order.stage);
   const nextStage = STAGE_ORDER[stageIdx + 1];
   const isDesign = order.stage === 'design';
+  const hasShorts = order.productConfig.toLowerCase().includes('shorts');
+  const hasTrouser = order.productConfig.toLowerCase().includes('trouser');
   const canAdvance = order.stage !== 'ready' && order.stage !== 'delivered' && canCompleteStage(role, order.stage, meta.permissions);
   const advanceBlocked = isDesign && !order.approved;
   const canUpload = isDesign && meta.permissions.includes('orders.artwork.upload');
@@ -222,7 +226,7 @@ export default function OrderDetailPage() {
             {order.players.length ? (
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>#</th><th>Name</th><th>No.</th><th>Sleeve</th><th>Jersey</th><th>Shorts</th><th>Trouser</th></tr></thead>
+                  <thead><tr><th>#</th><th>Name</th><th>No.</th><th>Sleeve</th><th>Jersey</th>{hasShorts && <th>Shorts</th>}{hasTrouser && <th>Trouser</th>}</tr></thead>
                   <tbody>
                     {order.players.map((p, i) => (
                       <tr key={i}>
@@ -231,8 +235,8 @@ export default function OrderDetailPage() {
                         <td>{p.number || '—'}</td>
                         <td>{p.sleeve}</td>
                         <td>{p.jerseySize || '—'}</td>
-                        <td>{p.shortsSize || '—'}</td>
-                        <td>{p.trouserSize || '—'}</td>
+                        {hasShorts && <td>{p.shortsSize || '—'}</td>}
+                        {hasTrouser && <td>{p.trouserSize || '—'}</td>}
                       </tr>
                     ))}
                   </tbody>
@@ -381,7 +385,9 @@ function FileList({ files }: { files: StoredFile[] }) {
     <div className="file-list">
       {files.map((f) => (
         <a key={f.storedName} className="file-link" href={f.url} target="_blank" rel="noreferrer">
-          <span aria-hidden>{f.kind === 'jersey' ? '👕' : '📎'}</span>
+          {f.mimeType.startsWith('image/') && f.mimeType !== 'image/svg+xml'
+            ? <img className="file-thumb" src={f.url} alt={f.originalName} />
+            : <span aria-hidden>{f.kind === 'jersey' ? '👕' : '📎'}</span>}
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.originalName}</span>
           <span className="muted small">{f.kind === 'jersey' ? 'Jersey image · ' : ''}{fileSize(f.size)}</span>
         </a>
@@ -465,6 +471,14 @@ function UploadArtworkModal({ order, onClose, onSaved }: { order: Order; onClose
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [fileError, setFileError] = useState('');
+  function selectFile(selected: File | undefined) {
+    if (!selected) { setFile(null); setFileError(''); return; }
+    const message = validateUploadFile(selected, { extensions: DESIGN_EXTENSIONS, label: 'Artwork file' });
+    setFileError(message);
+    setFile(message ? null : selected);
+    if (message) toast(message, 'error');
+  }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
@@ -487,8 +501,9 @@ function UploadArtworkModal({ order, onClose, onSaved }: { order: Order; onClose
         {error && <Notice tone="error" style={{ marginBottom: 14 }}>{error}</Notice>}
         {order.approved && <Notice tone="warn" style={{ marginBottom: 14 }}>v{order.currentVersion} is already approved. Uploading a new version will require approval again.</Notice>}
         <div className="form-grid">
-          <Field label="Artwork file *" full hint="PNG/JPG previews best. PDF, AI, EPS, SVG, PSD and CDR are also accepted">
-            <input type="file" required accept="image/*,.pdf,.ai,.eps,.svg,.psd,.cdr" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          <Field label="Artwork file *" full hint="PNG/JPG previews best. PDF, AI, EPS, SVG, PSD and CDR are also accepted · up to 15 MB" error={fileError}>
+            <input type="file" required accept="image/png,image/jpeg,image/webp,image/gif,.pdf,.ai,.eps,.svg,.psd,.cdr" onChange={(e) => { selectFile(e.target.files?.[0]); e.currentTarget.value = ''; }} />
+            {file && <LocalFilePreview file={file} />}
           </Field>
           <Field label="What changed?" full>
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Logo enlarged, sponsor moved to back" />

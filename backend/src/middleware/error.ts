@@ -14,7 +14,14 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     return;
   }
   if (err instanceof multer.MulterError) {
-    const message = err.code === 'LIMIT_FILE_SIZE' ? 'File is too large' : err.message;
+    const maxSize = err.field === 'avatar' || err.field === 'logo' ? '5 MB' : `${Number(process.env.MAX_UPLOAD_MB ?? 15)} MB`;
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? `${err.field ? `${err.field} ` : ''}file is too large. Maximum size is ${maxSize}.`
+      : err.code === 'LIMIT_FILE_COUNT'
+        ? 'Too many files uploaded. Please reduce the number of files and try again.'
+        : err.code === 'LIMIT_UNEXPECTED_FILE'
+          ? `Unexpected upload field${err.field ? `: ${err.field}` : ''}.`
+          : err.message;
     res.status(400).json({ error: message });
     return;
   }

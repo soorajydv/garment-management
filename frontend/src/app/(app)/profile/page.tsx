@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
+import { LocalFilePreview } from '@/components/LocalFilePreview';
 import { Field, Notice, PageHeader, errorMessage } from '@/components/ui';
 import { roleLabel } from '@/lib/format';
+import { AVATAR_EXTENSIONS, MAX_AVATAR_BYTES, validateUploadFile } from '@/lib/uploads';
 
 export default function ProfilePage() {
   const { user, meta, refreshUser, logout } = useAuth();
@@ -15,9 +17,17 @@ export default function ProfilePage() {
   const [busy, setBusy] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   async function uploadAvatar(file: File | undefined) {
     if (!file) return;
+    const validationError = validateUploadFile(file, { maxBytes: MAX_AVATAR_BYTES, extensions: AVATAR_EXTENSIONS, label: 'Avatar image' });
+    if (validationError) {
+      setAvatarError(validationError);
+      toast(validationError, 'error');
+      return;
+    }
+    setAvatarFile(file);
     setAvatarBusy(true);
     setAvatarError('');
     try {
@@ -25,6 +35,7 @@ export default function ProfilePage() {
       formData.append('avatar', file);
       await api('/auth/avatar', { method: 'PATCH', form: formData });
       await refreshUser();
+      setAvatarFile(null);
       toast('Profile avatar updated');
     } catch (err) {
       setAvatarError(errorMessage(err));
@@ -72,7 +83,7 @@ export default function ProfilePage() {
           <div className="card-sub" style={{ marginBottom: 16 }}>These details are shown to your team.</div>
           <div className="profile-avatar-editor">
             <div className="profile-avatar-preview">{user.avatarUrl ? <img src={user.avatarUrl} alt="Profile avatar" /> : user.name.slice(0, 2).toUpperCase()}</div>
-            <div><strong>Profile avatar</strong><div className="card-sub">PNG, JPG, WEBP or GIF · up to 5 MB</div><div className="form-actions" style={{ marginTop: 8 }}><label className="btn small" style={{ cursor: avatarBusy ? 'wait' : 'pointer' }}>{avatarBusy ? 'Uploading…' : 'Choose image'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden disabled={avatarBusy} onChange={(e) => { void uploadAvatar(e.target.files?.[0]); e.currentTarget.value = ''; }} /></label>{user.avatarUrl && <button type="button" className="btn small" onClick={removeAvatar} disabled={avatarBusy}>Remove</button>}</div>{avatarError && <div className="error-text">{avatarError}</div>}</div>
+            <div><strong>Profile avatar</strong><div className="card-sub">PNG, JPG, WEBP or GIF · up to 5 MB</div>{avatarFile && <LocalFilePreview file={avatarFile} />}<div className="form-actions" style={{ marginTop: 8 }}><label className="btn small" style={{ cursor: avatarBusy ? 'wait' : 'pointer' }}>{avatarBusy ? 'Uploading…' : 'Choose image'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden disabled={avatarBusy} onChange={(e) => { void uploadAvatar(e.target.files?.[0]); e.currentTarget.value = ''; }} /></label>{user.avatarUrl && <button type="button" className="btn small" onClick={removeAvatar} disabled={avatarBusy}>Remove</button>}</div>{avatarError && <div className="error-text">{avatarError}</div>}</div>
           </div>
           <form onSubmit={saveProfile} className="form-grid">
             <Field label="Full name *" full><input required minLength={2} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>

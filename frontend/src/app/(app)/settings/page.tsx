@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { useToast } from '@/components/Toast';
+import { LocalFilePreview } from '@/components/LocalFilePreview';
 import { Field, Notice, PageHeader, errorMessage } from '@/components/ui';
+import { AVATAR_EXTENSIONS, MAX_AVATAR_BYTES, validateUploadFile } from '@/lib/uploads';
 
 export default function SettingsPage() {
   const { meta, settings, refreshSettings } = useAuth();
@@ -15,10 +17,18 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoError, setLogoError] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value });
 
   async function uploadLogo(file: File | undefined) {
     if (!file) return;
+    const validationError = validateUploadFile(file, { maxBytes: MAX_AVATAR_BYTES, extensions: AVATAR_EXTENSIONS, label: 'Business logo' });
+    if (validationError) {
+      setLogoError(validationError);
+      toast(validationError, 'error');
+      return;
+    }
+    setLogoFile(file);
     setLogoBusy(true);
     setLogoError('');
     try {
@@ -26,6 +36,7 @@ export default function SettingsPage() {
       formData.append('logo', file);
       await api('/settings/business-logo', { method: 'PATCH', form: formData });
       await refreshSettings();
+      setLogoFile(null);
       toast('Business logo updated');
     } catch (err) {
       setLogoError(errorMessage(err));
@@ -78,7 +89,7 @@ export default function SettingsPage() {
             {error && <Notice tone="error" style={{ marginBottom: 14 }}>{error}</Notice>}
             <div className="profile-avatar-editor" style={{ marginBottom: 20 }}>
               <div className="profile-avatar-preview business-logo-preview">{settings.logoUrl ? <img src={settings.logoUrl} alt="Business logo" /> : 'S&S'}</div>
-              <div><strong>Business logo</strong><div className="card-sub">Shown in the sidebar and business documents. PNG, JPG, WEBP or GIF · up to 5 MB</div><div className="form-actions" style={{ marginTop: 8 }}><label className="btn small" style={{ cursor: logoBusy ? 'wait' : 'pointer' }}>{logoBusy ? 'Uploading…' : 'Choose image'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden disabled={logoBusy} onChange={(e) => { void uploadLogo(e.target.files?.[0]); e.currentTarget.value = ''; }} /></label>{settings.logoUrl && <button type="button" className="btn small" onClick={removeLogo} disabled={logoBusy}>Remove</button>}</div>{logoError && <div className="error-text">{logoError}</div>}</div>
+              <div><strong>Business logo</strong><div className="card-sub">Shown in the sidebar and business documents. PNG, JPG, WEBP or GIF · up to 5 MB</div>{logoFile && <LocalFilePreview file={logoFile} />}<div className="form-actions" style={{ marginTop: 8 }}><label className="btn small" style={{ cursor: logoBusy ? 'wait' : 'pointer' }}>{logoBusy ? 'Uploading…' : 'Choose image'}<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden disabled={logoBusy} onChange={(e) => { void uploadLogo(e.target.files?.[0]); e.currentTarget.value = ''; }} /></label>{settings.logoUrl && <button type="button" className="btn small" onClick={removeLogo} disabled={logoBusy}>Remove</button>}</div>{logoError && <div className="error-text">{logoError}</div>}</div>
             </div>
             <div className="form-grid">
               <Field label="Registered business name *" full><input required value={form.businessName} onChange={set('businessName')} /></Field>

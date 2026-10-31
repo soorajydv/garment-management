@@ -200,6 +200,10 @@ tbody tr.clickable:hover td { background: light-dark(#f7f9f6, #1c2a22); }
 .player-table td { padding: 6px; }
 .form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
 .checkbox-line { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.checkbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.checkbox-card { display: flex; align-items: flex-start; gap: 8px; min-height: 42px; padding: 10px 11px; border: 1px solid light-dark(#dce3da, #3a493f); border-radius: 9px; background: light-dark(#fbfcfa, #121b16); color: inherit; font-size: 11px; line-height: 1.35; cursor: pointer; }
+.checkbox-card:hover, .checkbox-card.selected { border-color: #6d9a7b; background: light-dark(#f1f7f0, #1e3024); }
+.checkbox-card input { width: 15px; height: 15px; margin: 1px 0 0; flex: 0 0 auto; accent-color: var(--site-primary); }
 .permission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; margin-top: 8px; }
 .permission-groups { display: grid; gap: 18px; margin-top: 8px; }
 .permission-group { border-top: 1px solid light-dark(#e3e9e2, #2d3b32); padding-top: 14px; }
@@ -256,6 +260,7 @@ tbody tr.clickable:hover td { background: light-dark(#f7f9f6, #1c2a22); }
 .artwork .meta { padding: 9px 10px; font-size: 11px; line-height: 1.5; }
 .file-list { display: grid; gap: 6px; }
 .file-link { display: flex; gap: 8px; align-items: center; font-size: 12px; padding: 8px 10px; border: 1px solid light-dark(#e0e6df, #2c3b32); border-radius: 9px; }
+.file-thumb { width: 42px; height: 42px; object-fit: cover; border-radius: 6px; background: #fff; flex: 0 0 42px; }
 .file-link:hover { border-color: #6d9a7b; }
 .timeline { display: grid; gap: 0; }
 .timeline-item { display: grid; grid-template-columns: 14px 1fr; gap: 10px; padding-bottom: 14px; position: relative; }
@@ -298,6 +303,12 @@ tbody tr.clickable:hover td { background: light-dark(#f7f9f6, #1c2a22); }
 .toast-stack { position: fixed; right: 20px; bottom: 20px; display: grid; gap: 8px; z-index: 60; }
 .toast { background: light-dark(#173d35, #d8e8dc); color: light-dark(#fff, #173d35); padding: 11px 15px; border-radius: 10px; font-size: 12px; font-weight: 650; box-shadow: 0 10px 30px #0003; max-width: 360px; }
 .toast.error { background: light-dark(#9c3d34, #ffb4aa); color: light-dark(#fff, #3d201d); }
+.local-file-preview { display: flex; align-items: center; gap: 9px; margin-top: 8px; padding: 8px; border: 1px solid light-dark(#dce3da, #3a493f); border-radius: 9px; background: light-dark(#fbfcfa, #121b16); min-width: 0; }
+.local-file-preview img { width: 58px; height: 58px; object-fit: cover; border-radius: 6px; background: #fff; }
+.local-file-icon { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 6px; background: light-dark(#edf1eb, #28372e); font-size: 22px; }
+.local-file-copy { display: grid; gap: 3px; min-width: 0; overflow: hidden; }
+.local-file-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.local-file-copy small { color: light-dark(#87938a, #9aaba0); font-size: 10px; }
 
 /* ---------- login ---------- */
 .login-wrap { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
@@ -520,6 +531,8 @@ tbody tr.clickable:hover td { background: light-dark(#f2f5f9, #1a4062); }
 .notice.error { background: light-dark(#f7e6eb, #4d2b39); border-color: light-dark(#ecc5cf, #684050); color: light-dark(#a43f50, #f0a8b5); }
 .toast { background: light-dark(var(--palette-navy), var(--palette-soft)); color: light-dark(#fff, var(--palette-navy)); }
 .toast.error { background: light-dark(#a43f50, #e9a7b4); color: #fff; }
+html[data-theme="dark"] .toast.error { background: #8f1d2c; border: 1px solid #ef6678; color: #fff; }
+html[data-theme="dark"] .notice.error { background: #4a1720; border-color: #a83a4c; color: #ffb8c1; }
 .login-art { background: var(--palette-navy); }
 .login-art p { color: #c1d0df; }
 .spinner { border-color: light-dark(#dbe2ef, #2b4b6b); border-top-color: var(--palette-blue); }

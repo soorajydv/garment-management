@@ -29,7 +29,9 @@ export async function api<T = unknown>(path: string, { method = 'GET', body, for
     if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/')) {
       window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
     }
-    throw new ApiError(res.status, data?.error ?? `Request failed (${res.status})`, data?.details);
+    const message = data?.error ?? `Request failed (${res.status})`;
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('app-api-error', { detail: message }));
+    throw new ApiError(res.status, message, data?.details);
   }
   return data as T;
 }
